@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Billing Admin | QuizPro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header style="border-bottom: 1px solid #fee2e2;">
+        <a href="#" class="logo" style="color: #2563eb;">Billing Admin Area</a>
+        <nav><a href="/logout">Logout</a></nav>
+    </header>
+
+    <main class="container">
+        <h2>User Management</h2>
+        <p style="color: var(--text-muted); margin-bottom: 2rem;">Manage active subscriptions and user accounts.</p>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}<p style="color: #059669; margin-bottom: 1rem; font-weight: bold;">{{ messages[0] }}</p>{% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
+                        <th style="padding: 1rem; font-weight: 600;">Sign-up Date</th>
+                        <th style="padding: 1rem; font-weight: 600;">Name</th>
+                        <th style="padding: 1rem; font-weight: 600;">Phone / Identifier</th>
+                        <th style="padding: 1rem; font-weight: 600;">Plan</th>
+                        <th style="padding: 1rem; font-weight: 600; text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 1rem; color: var(--text-muted);">{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else 'Unknown' }}</td>
+                        <td style="padding: 1rem; font-weight: 500;">{{ u.name }}</td>
+                        <td style="padding: 1rem;">{{ u.identifier }}</td>
+                        <td style="padding: 1rem;">
+                            <span style="background: var(--bg-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85rem; text-transform: uppercase;">
+                                {{ u.plan }}
+                            </span>
+                        </td>
+                        <td style="padding: 1rem; text-align: right;">
+                            <a href="/admin/billing/edit_user/{{ u.id }}" class="btn btn-outline" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Edit User</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-muted);">No users found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

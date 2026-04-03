@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Active Quiz | QuizPro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header style="border-bottom: 1px solid var(--border);">
+        <a href="/" class="logo">
+            <img src="{{ url_for('static', filename='mata_logo.jpeg') }}" alt="MATA Logo" style="height: 40px; width: auto;">
+        </a>
+        <nav>
+            <a href="/dashboard">Асуултаас гарах</a>
+        </nav>
+    </header>
+
+    <main class="quiz-container" style="padding: 3rem 5%;">
+        <div style="text-align: center; margin-bottom: 3rem;">
+            <h2>Асуултанд хариулах</h2>
+            <p style="color: var(--text-muted);">Илгээхээсээ өмнө бүх асуултанд хариулна уу.</p>
+        </div>
+
+        {% if not questions %}
+        <div class="card" style="text-align: center;">
+            <p>No questions available in the database right now. Tell your administrator to add some!</p>
+            <a href="/dashboard" class="btn" style="margin-top: 1rem;">Return Home</a>
+        </div>
+        {% else %}
+        
+        <form action="/submit_quiz" method="POST">
+            {% set q_ids = [] %}
+            
+            {% for q in questions %}
+                {% set _ = q_ids.append(q.id|string) %}
+                <div class="question-card">
+                    <div class="question-text">
+                        <span style="color: var(--primary); margin-right: 0.5rem;">{{ loop.index }}.</span>
+                        {{ q.question_text }}
+                    </div>
+                    
+                    <div class="options-group">
+                        {% if q.q_type == 'mcq' %}
+                            <div class="shuffle-opts" style="display: flex; flex-direction: column;">
+                            {% for opt in [q.option_a, q.option_b, q.option_c, q.option_d] %}
+                                {% if opt %}
+                                <label class="option-label">
+                                    <input type="radio" name="q_{{ q.id }}" value="{{ ['A','B','C','D'][loop.index0] }}" required>
+                                    <span class="letter-label" style="font-weight: 500; margin-right: 0.5rem;">{{ ['A', 'B', 'C', 'D'][loop.index0] }}:</span> {{ opt }}
+                                </label>
+                                {% endif %}
+                            {% endfor %}
+                            </div>
+                            
+                        {% elif q.q_type == 'tf' %}
+                            <label class="option-label">
+                                <input type="radio" name="q_{{ q.id }}" value="True" required> True
+                            </label>
+                            <label class="option-label">
+                                <input type="radio" name="q_{{ q.id }}" value="False" required> False
+                            </label>
+                            
+                        {% elif q.q_type == 'numeric' %}
+                            <input type="number" step="any" name="q_{{ q.id }}" class="form-control" placeholder="Enter numeric answer..." required style="max-width: 300px;">
+                            
+                        {% elif q.q_type == 'multi_select' %}
+                            <div class="shuffle-opts" style="display: flex; flex-direction: column;">
+                            {% for opt in [q.option_a, q.option_b, q.option_c, q.option_d] %}
+                                {% if opt %}
+                                <label class="option-label">
+                                    <input type="checkbox" name="q_{{ q.id }}" value="{{ ['A','B','C','D'][loop.index0] }}">
+                                    <span class="letter-label" style="font-weight: 500; margin-right: 0.5rem;">{{ ['A', 'B', 'C', 'D'][loop.index0] }}:</span> {{ opt }}
+                                </label>
+                                {% endif %}
+                            {% endfor %}
+                            </div>
+                            
+                        {% elif q.q_type == 'matching' %}
+                            <p style="color: var(--text-muted); margin-bottom: 0.5rem; font-size: 0.9rem;">Холбох асуулт: Зүүн талын сонголтыг дарж баруун талын сонголттой холбоно уу.</p>
+                            
+                            <div class="matching-arena" data-qid="{{ q.id }}" style="position: relative; display: flex; justify-content: space-between; padding: 1rem; background: var(--bg-color); border-radius: 8px; margin-top: 1rem;">
+                                <svg class="matching-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></svg>
+                                
+                                <div class="match-left" style="display: flex; flex-direction: column; gap: 1rem; width: 40%; z-index: 2;">
+                                    {% for opt in [q.option_a, q.option_b, q.option_c, q.option_d] %}
+                                        {% if opt and '=' in opt %}
+                                            {% set parts = opt.split('=', 1) %}
+                                            <button type="button" class="match-btn left-btn" data-val="{{ parts[0].strip() }}" style="padding: 1rem; border: 2px solid var(--border); border-radius: 8px; background: white; cursor: pointer; font-weight: 500;">{{ parts[0].strip() }}</button>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                
+                                <div class="match-right" style="display: flex; flex-direction: column; gap: 1rem; width: 40%; z-index: 2;">
+                                    {% for opt in [q.option_a, q.option_b, q.option_c, q.option_d] %}
+                                        {% if opt and '=' in opt %}
+                                            {% set parts = opt.split('=', 1) %}
+                                            <button type="button" class="match-btn right-btn" data-val="{{ parts[1].strip() }}" style="padding: 1rem; border: 2px solid var(--border); border-radius: 8px; background: white; cursor: pointer; font-weight: 500;">{{ parts[1].strip() }}</button>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                
+                                <input type="hidden" name="match_{{ q.id }}_data" class="match-data" value="{}">
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+            
+            <input type="hidden" name="q_ids" value="{{ q_ids | join(',') }}">
+            
+            <div style="text-align: right; margin-top: 2rem;">
+                <button type="submit" class="btn" style="padding: 1rem 3rem; font-size: 1.1rem;">Submit Assessment</button>
+            </div>
+        </form>
+        {% endif %}
+    </main>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Shuffle MCQ and Multi-Select options
+            document.querySelectorAll('.shuffle-opts').forEach(wrapper => {
+                for (let i = wrapper.children.length; i >= 0; i--) {
+                    wrapper.appendChild(wrapper.children[Math.random() * i | 0]);
+                }
+                // Relabel the spans so they still read A, B, C, D physically
+                const letters = ['A', 'B', 'C', 'D', 'E'];
+                Array.from(wrapper.children).forEach((child, index) => {
+                    const span = child.querySelector('.letter-label');
+                    if(span) span.textContent = letters[index] + ':';
+                });
+            });
+
+            document.querySelectorAll('.matching-arena').forEach(arena => {
+                const rightCol = arena.querySelector('.match-right');
+                for (let i = rightCol.children.length; i >= 0; i--) {
+                    rightCol.appendChild(rightCol.children[Math.random() * i | 0]);
+                }
+                
+                let activeLeftBtn = null;
+                let connections = {}; 
+                const svg = arena.querySelector('.matching-svg');
+                const dataInput = arena.querySelector('.match-data');
+                
+                const updateLines = () => {
+                    svg.innerHTML = '';
+                    for (let leftVal in connections) {
+                        const c = connections[leftVal];
+                        const lRect = c.leftBtn.getBoundingClientRect();
+                        const rRect = c.rightBtn.getBoundingClientRect();
+                        const svgRect = svg.getBoundingClientRect();
+                        
+                        const x1 = lRect.right - svgRect.left;
+                        const y1 = lRect.top + lRect.height/2 - svgRect.top;
+                        const x2 = rRect.left - svgRect.left;
+                        const y2 = rRect.top + rRect.height/2 - svgRect.top;
+                        
+                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        path.setAttribute('d', `M ${x1} ${y1} C ${x1 + 50} ${y1}, ${x2 - 50} ${y2}, ${x2} ${y2}`);
+                        path.setAttribute('stroke', '#2563eb');
+                        path.setAttribute('stroke-width', '3');
+                        path.setAttribute('fill', 'none');
+                        svg.appendChild(path);
+                    }
+                };
+
+                const updateData = () => {
+                    const res = {};
+                    for (let l in connections) { res[l] = connections[l].rightVal; }
+                    dataInput.value = JSON.stringify(res);
+                };
+
+                arena.querySelectorAll('.left-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        if (btn === activeLeftBtn) {
+                            btn.style.borderColor = 'var(--border)';
+                            activeLeftBtn = null;
+                            return;
+                        }
+                        if (activeLeftBtn) activeLeftBtn.style.borderColor = 'var(--border)';
+                        activeLeftBtn = btn;
+                        btn.style.borderColor = '#2563eb';
+                    });
+                });
+
+                arena.querySelectorAll('.right-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        if (!activeLeftBtn) return;
+                        const leftVal = activeLeftBtn.dataset.val;
+                        const rightVal = btn.dataset.val;
+                        
+                        for (let l in connections) {
+                            if (connections[l].rightBtn === btn) delete connections[l];
+                        }
+                        
+                        connections[leftVal] = { rightVal, rightBtn: btn, leftBtn: activeLeftBtn };
+                        activeLeftBtn.style.borderColor = 'var(--border)';
+                        activeLeftBtn = null;
+                        
+                        updateLines();
+                        updateData();
+                    });
+                });
+
+                window.addEventListener('resize', updateLines);
+            });
+        });
+    </script>
+</body>
+</html>

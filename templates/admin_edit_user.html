@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit User | QuizPro Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header style="border-bottom: 1px solid #fee2e2;">
+        <a href="/admin/billing" class="logo" style="color: #2563eb;">Billing Admin Area</a>
+        <nav><a href="/logout">Logout</a></nav>
+    </header>
+
+    <main class="container">
+        <h2 style="margin-bottom: 1rem;">Edit User Details</h2>
+        <a href="/admin/billing" style="color: var(--primary); text-decoration: none; font-weight: 500;">&larr; Back to Admin Dashboard</a>
+        
+        <div class="card" style="max-width: 600px; margin-top: 2rem;">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">Identifier / Phone: <strong>{{ u.identifier }}</strong></p>
+            <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">Joined: {{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else 'Unknown' }}</p>
+            
+            <form action="/admin/billing/edit_user/{{ u.id }}" method="POST">
+                <div class="form-group" style="margin-top: 1.5rem;">
+                    <label>User's Full Name</label>
+                    <input type="text" name="name" class="form-control" value="{{ u.name }}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Override Password (leave blank to keep current)</label>
+                    <input type="password" name="password" class="form-control" placeholder="New Password...">
+                </div>
+
+                <div class="form-group">
+                    <label>System Role</label>
+                    <select name="role" class="form-control">
+                        <option value="user" {% if u.role == 'user' %}selected{% endif %}>Standard User</option>
+                        <option value="content_admin" {% if u.role == 'content_admin' %}selected{% endif %}>Content Admin</option>
+                        <option value="billing_admin" {% if u.role == 'billing_admin' %}selected{% endif %}>Billing Admin</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Subscription Plan</label>
+                    <select name="plan" class="form-control" style="border-color: #2563eb;">
+                        <option value="none" {% if u.plan == 'none' %}selected{% endif %}>None (Free Tier)</option>
+                        <option value="plus" {% if u.plan == 'plus' %}selected{% endif %}>QuizPro Plus</option>
+                        <option value="pro" {% if u.plan == 'pro' %}selected{% endif %}>QuizPro Pro</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Plan Expiration Date (leave blank for unlimited)</label>
+                    <input type="date" name="plan_expire_date" class="form-control" value="{{ u.plan_expire_date.strftime('%Y-%m-%d') if u.plan_expire_date else '' }}" style="border-color: #2563eb;">
+                </div>
+
+                <button type="submit" class="btn" style="background-color: #2563eb; width: 100%; margin-top: 1rem;">Update User Settings</button>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

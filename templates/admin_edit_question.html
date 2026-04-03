@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Question | QuizPro Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header style="border-bottom: 1px solid #fee2e2;">
+        <a href="/admin/content" class="logo" style="color: #dc2626;">Асуулт өөрчлөх систем</a>
+        <nav><a href="/logout">Гарах</a></nav>
+    </header>
+
+    <main class="container">
+        <h2 style="margin-bottom: 1rem;">Асуулт өөрчлөх</h2>
+        <a href="/admin/content" style="color: var(--primary); text-decoration: none; font-weight: 500;">&larr; Админ хуудас-руу буцах</a>
+        
+        <div class="card" style="max-width: 800px; margin-top: 2rem;">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">Асуултын төрөл: <strong>{{ q.q_type | upper }}</strong></p>
+            
+            <form action="/admin/content/edit/{{ q.id }}" method="POST">
+                <div class="form-group">
+                    <label>Question Text</label>
+                    <textarea name="question_text" class="form-control" rows="3" required>{{ q.question_text }}</textarea>
+                </div>
+
+                {% if q.q_type == 'mcq' %}
+                <div class="form-group">
+                    <label>Хариулт A</label>
+                    <input type="text" name="mcq_a" class="form-control" value="{{ q.option_a or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Хариулт B</label>
+                    <input type="text" name="mcq_b" class="form-control" value="{{ q.option_b or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Хариулт C</label>
+                    <input type="text" name="mcq_c" class="form-control" value="{{ q.option_c or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Хариулт D</label>
+                    <input type="text" name="mcq_d" class="form-control" value="{{ q.option_d or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Зөв хариулт (A, B, C, or D)</label>
+                    <select name="mcq_correct" class="form-control">
+                        <option {% if q.correct_answer == 'A' %}selected{% endif %}>A</option>
+                        <option {% if q.correct_answer == 'B' %}selected{% endif %}>B</option>
+                        <option {% if q.correct_answer == 'C' %}selected{% endif %}>C</option>
+                        <option {% if q.correct_answer == 'D' %}selected{% endif %}>D</option>
+                    </select>
+                </div>
+
+                {% elif q.q_type == 'tf' %}
+                <div class="form-group">
+                    <label>Зөв хариулт (Үнэн эсвэл Худал)</label>
+                    <select name="tf_correct" class="form-control">
+                        <option value="True" {% if q.correct_answer == 'True' %}selected{% endif %}>Үнэн</option>
+                        <option value="False" {% if q.correct_answer == 'False' %}selected{% endif %}>Худал</option>
+                    </select>
+                </div>
+
+                {% elif q.q_type == 'numeric' %}
+                <div class="form-group">
+                    <label>Тоон хариулт</label>
+                    <input type="number" step="any" name="num_correct" class="form-control" value="{{ q.correct_answer }}" required>
+                </div>
+
+                {% elif q.q_type == 'matching' %}
+                <div class="form-group">
+                    <label>Тохирох хариулт 1 (Prompt = Answer)</label>
+                    <input type="text" name="match_1" class="form-control" value="{{ q.option_a or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Тохирох хариулт 2</label>
+                    <input type="text" name="match_2" class="form-control" value="{{ q.option_b or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Тохирох хариулт 3</label>
+                    <input type="text" name="match_3" class="form-control" value="{{ q.option_c or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Тохирох хариулт 4</label>
+                    <input type="text" name="match_4" class="form-control" value="{{ q.option_d or '' }}">
+                </div>
+                {% elif q.q_type == 'multi_select' %}
+                <div class="form-group">
+                    <p style="margin-bottom: 0.5rem;">Multi-Select Options (Check correct answers)</p>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
+                        <input type="checkbox" name="ms_correct" value="A" {% if 'A' in q.correct_answer.split(',') %}checked{% endif %}><input type="text" name="ms_a" class="form-control" value="{{ q.option_a or '' }}">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
+                        <input type="checkbox" name="ms_correct" value="B" {% if 'B' in q.correct_answer.split(',') %}checked{% endif %}><input type="text" name="ms_b" class="form-control" value="{{ q.option_b or '' }}">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
+                        <input type="checkbox" name="ms_correct" value="C" {% if 'C' in q.correct_answer.split(',') %}checked{% endif %}><input type="text" name="ms_c" class="form-control" value="{{ q.option_c or '' }}">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="checkbox" name="ms_correct" value="D" {% if 'D' in q.correct_answer.split(',') %}checked{% endif %}><input type="text" name="ms_d" class="form-control" value="{{ q.option_d or '' }}">
+                    </div>
+                </div>
+                {% endif %}
+
+                <button type="submit" class="btn" style="background-color: #059669; margin-top: 20px;">Save Changes</button>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

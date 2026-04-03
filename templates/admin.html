@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Content Admin | QuizPro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Hide all dynamic fields by default except the first one */
+        .dynamic-field { display: none; margin-top: 15px; padding: 15px; background: #f9fafb; border-radius: 8px; border: 1px dashed #cbd5e1; }
+        #mcq-fields { display: block; }
+    </style>
+</head>
+<body>
+    <header style="border-bottom: 1px solid #fee2e2;">
+        <a href="#" class="logo" style="color: #dc2626;">Content Admin Area</a>
+        <nav><a href="/logout">Logout</a></nav>
+    </header>
+
+    <main class="container">
+        <h2>Add New Question</h2>
+        <p style="color: #059669; font-weight: bold;">Total Questions: {{ total }}</p>
+        
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}<p style="color: #059669; margin-bottom: 1rem;">{{ messages[0] }}</p>{% endif %}
+        {% endwith %}
+
+        <div class="card" style="max-width: 800px;">
+            <form action="/admin/content" method="POST">
+                
+                <div class="form-group">
+                    <label>Question Type</label>
+                    <select name="q_type" id="q_type" class="form-control" style="border-color: #4f46e5;">
+                        <option value="mcq">Multiple Choice (Single Answer)</option>
+                        <option value="multi_select">Multi-Select (Multiple Answers)</option>
+                        <option value="tf">True / False</option>
+                        <option value="numeric">Numeric / Calculation</option>
+                        <option value="matching">Matching Pairs</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Question Text</label>
+                    <textarea name="question_text" class="form-control" rows="3" required></textarea>
+                </div>
+
+                <div id="mcq-fields" class="dynamic-field">
+                    <h4>Multiple Choice Options</h4>
+                    <input type="text" name="mcq_a" class="form-control" placeholder="Option A" style="margin-bottom: 5px;">
+                    <input type="text" name="mcq_b" class="form-control" placeholder="Option B" style="margin-bottom: 5px;">
+                    <input type="text" name="mcq_c" class="form-control" placeholder="Option C" style="margin-bottom: 5px;">
+                    <input type="text" name="mcq_d" class="form-control" placeholder="Option D" style="margin-bottom: 10px;">
+                    <label>Correct Answer:</label>
+                    <select name="mcq_correct" class="form-control"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+                </div>
+
+                <div id="tf-fields" class="dynamic-field">
+                    <h4>True or False Answer</h4>
+                    <select name="tf_correct" class="form-control">
+                        <option value="True">True</option>
+                        <option value="False">False</option>
+                    </select>
+                </div>
+
+                <div id="numeric-fields" class="dynamic-field">
+                    <h4>Numeric Answer</h4>
+                    <label>Exact Number Required:</label>
+                    <input type="number" step="any" name="num_correct" class="form-control" placeholder="e.g. 42.5">
+                </div>
+
+                <div id="matching-fields" class="dynamic-field">
+                    <h4>Matching Pairs (Format: "Prompt = Answer")</h4>
+                    <input type="text" name="match_1" class="form-control" placeholder="e.g. Apple = Red" style="margin-bottom: 5px;">
+                    <input type="text" name="match_2" class="form-control" placeholder="e.g. Banana = Yellow" style="margin-bottom: 5px;">
+                    <input type="text" name="match_3" class="form-control" placeholder="e.g. Sky = Blue" style="margin-bottom: 5px;">
+                    <input type="text" name="match_4" class="form-control" placeholder="e.g. Grass = Green">
+                </div>
+
+                <div id="multi_select-fields" class="dynamic-field">
+                    <h4>Multi-Select Options (Check all correct answers)</h4>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
+                        <input type="checkbox" name="ms_correct" value="A"><input type="text" name="ms_a" class="form-control" placeholder="Option A">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
+                        <input type="checkbox" name="ms_correct" value="B"><input type="text" name="ms_b" class="form-control" placeholder="Option B">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
+                        <input type="checkbox" name="ms_correct" value="C"><input type="text" name="ms_c" class="form-control" placeholder="Option C">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="checkbox" name="ms_correct" value="D"><input type="text" name="ms_d" class="form-control" placeholder="Option D">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" style="background-color: #059669; margin-top: 20px;">Save Question</button>
+            </form>
+        </div>
+        <div class="card" style="margin-top: 3rem;">
+            <h2>Search & Manage Questions</h2>
+            <form action="/admin/content" method="GET" style="display: flex; gap: 1rem; align-items: center; margin: 1.5rem 0; flex-wrap: wrap;">
+                <label for="search_type" style="font-weight: 500;">Type:</label>
+                <select name="search_type" class="form-control" style="width: auto;">
+                    <option value="all">All Types</option>
+                    <option value="mcq" {% if search_type == 'mcq' %}selected{% endif %}>MCQ</option>
+                    <option value="multi_select" {% if search_type == 'multi_select' %}selected{% endif %}>Multi-Select</option>
+                    <option value="tf" {% if search_type == 'tf' %}selected{% endif %}>True/False</option>
+                    <option value="numeric" {% if search_type == 'numeric' %}selected{% endif %}>Numeric</option>
+                    <option value="matching" {% if search_type == 'matching' %}selected{% endif %}>Matching</option>
+                </select>
+                <label for="search_date" style="font-weight: 500;">Filter by Date:</label>
+                <input type="date" name="search_date" value="{{ search_date or '' }}" class="form-control" style="width: auto;">
+                <button type="submit" class="btn" style="padding: 0.5rem 1rem;">Search</button>
+                <a href="/admin/content" class="btn btn-outline" style="padding: 0.5rem 1rem;">Clear</a>
+            </form>
+
+            <table style="width: 100%; border-collapse: collapse; text-align: left; margin-top: 1rem;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
+                        <th style="padding: 1rem; font-weight: 600;">Date</th>
+                        <th style="padding: 1rem; font-weight: 600;">Type</th>
+                        <th style="padding: 1rem; font-weight: 600;">Question Content</th>
+                        <th style="padding: 1rem; font-weight: 600; text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for q in questions %}
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 1rem; color: var(--text-muted);">{{ q.created_at.strftime('%Y-%m-%d') if q.created_at else 'Unknown' }}</td>
+                        <td style="padding: 1rem;"><span style="background: var(--bg-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85rem;">{{ q.q_type | upper }}</span></td>
+                        <td style="padding: 1rem;">{{ q.question_text[:50] }}...</td>
+                        <td style="padding: 1rem; text-align: right; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                            <a href="/admin/content/edit/{{ q.id }}" class="btn" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Edit</a>
+                            <form action="/admin/content/delete/{{ q.id }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to permanently delete this question?');">
+                                <button type="submit" class="btn btn-outline" style="padding: 0.4rem 1rem; font-size: 0.85rem; border-color: #dc2626; color: #dc2626;">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="padding: 2rem; text-align: center; color: var(--text-muted);">No questions found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        const typeSelect = document.getElementById('q_type');
+        const fields = {
+            'mcq': document.getElementById('mcq-fields'),
+            'multi_select': document.getElementById('multi_select-fields'),
+            'tf': document.getElementById('tf-fields'),
+            'numeric': document.getElementById('numeric-fields'),
+            'matching': document.getElementById('matching-fields')
+        };
+
+        typeSelect.addEventListener('change', function() {
+            // Hide all fields
+            for (let key in fields) { fields[key].style.display = 'none'; }
+            // Show the selected one
+            fields[this.value].style.display = 'block';
+        });
+    </script>
+</body>
+</html>
