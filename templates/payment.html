@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Төлбөр төлөх | QuizPro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <a href="/" class="logo">
+            <img src="{{ url_for('static', filename='mata_logo.jpeg') }}" alt="MATA Logo" style="height: 40px; width: auto;">
+        </a>
+        <nav><a href="/subscriptions">Буцах</a></nav>
+    </header>
+    <main class="container" style="max-width: 600px; padding-top: 4rem;">
+        <div class="card" style="text-align: center;">
+            <h2 style="margin-bottom: 2rem;">Төлбөр шилжүүлэх</h2>
+            <p style="margin-bottom: 2rem; color: var(--text-muted);">
+                Доорх данс руу төлбөрөө шилжүүлсний дараа <strong>"Би төлбөр төлсөн"</strong> товчийг дарж баталгаажуулна уу. <br>
+                <em>Гүйлгээний утга дээр өөрийн бүртгэлтэй утасны дугаараа ({{ current_user.identifier }}) заавал бичнэ үү!</em>
+            </p>
+
+            <div style="background: var(--bg-color); padding: 1.5rem; border-radius: 8px; text-align: left; margin-bottom: 2rem;">
+                <p style="margin-bottom: 0.5rem;"><strong>Банк:</strong> [Банкны нэр]</p>
+                <p style="margin-bottom: 0.5rem;"><strong>Дансны дугаар:</strong> 0000000000</p>
+                <p style="margin-bottom: 0.5rem;"><strong>Дансны нэр:</strong> [Нэр оруулах]</p>
+                <p style="margin-bottom: 0.5rem;"><strong>Мөнгөн дүн:</strong> {% if plan == 'plus' %}5,000₮{% else %}10,000₮{% endif %}</p>
+                <p><strong>Гүйлгээний утга:</strong> {{ current_user.identifier }}</p>
+            </div>
+
+            <form action="/payment/submit/{{ plan }}" method="POST">
+                <button type="submit" class="btn" style="width: 100%; font-size: 1.2rem; padding: 1rem; background-color: #059669;">Би төлбөр төлсөн</button>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

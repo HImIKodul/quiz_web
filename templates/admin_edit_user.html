@@ -41,20 +41,42 @@
 
                 <div class="form-group">
                     <label>Subscription Plan</label>
-                    <select name="plan" class="form-control" style="border-color: #2563eb;">
-                        <option value="none" {% if u.plan == 'none' %}selected{% endif %}>None (Free Tier)</option>
-                        <option value="plus" {% if u.plan == 'plus' %}selected{% endif %}>QuizPro Plus</option>
-                        <option value="pro" {% if u.plan == 'pro' %}selected{% endif %}>QuizPro Pro</option>
+                    <select name="plan" class="form-control" style="border-color: #2563eb;" onchange="updateMaxDevices(this.value)">
+                        <option value="none" {% if u.plan == 'none' %}selected{% endif %}>None (Free Tier - 1 device)</option>
+                        <option value="plus" {% if u.plan == 'plus' %}selected{% endif %}>QuizPro Plus (3 devices)</option>
+                        <option value="pro" {% if u.plan == 'pro' %}selected{% endif %}>QuizPro Pro (5 devices)</option>
                     </select>
                 </div>
 
                 <div class="form-group">
+                    <label>Max Allowed Devices (override if needed)</label>
+                    <input type="number" name="max_devices" id="max_devices" class="form-control" value="{{ u.max_devices if u.max_devices is not none else (5 if u.plan == 'pro' else (3 if u.plan == 'plus' else 1)) }}" min="1">
+                </div>
+
+                <div class="form-group">
                     <label>Plan Expiration Date (leave blank for unlimited)</label>
-                    <input type="date" name="plan_expire_date" class="form-control" value="{{ u.plan_expire_date.strftime('%Y-%m-%d') if u.plan_expire_date else '' }}" style="border-color: #2563eb;">
+                    <div style="display: flex; gap: 0.5rem; align-items: stretch;">
+                        <input type="date" name="plan_expire_date" id="plan_expire_date" class="form-control" value="{{ u.plan_expire_date.strftime('%Y-%m-%d') if u.plan_expire_date else '' }}" style="border-color: #2563eb; flex: 1;">
+                        <button type="button" class="btn btn-outline" style="padding: 0 1rem; border-color: #2563eb; color: #2563eb; background: transparent; cursor: pointer; border-radius: 4px;" onclick="addOneMonth()">+1 Month from Today</button>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn" style="background-color: #2563eb; width: 100%; margin-top: 1rem;">Update User Settings</button>
             </form>
+            
+            <script>
+                function addOneMonth() {
+                    let d = new Date();
+                    d.setMonth(d.getMonth() + 1);
+                    document.getElementById('plan_expire_date').value = d.toISOString().split('T')[0];
+                }
+                function updateMaxDevices(plan) {
+                    let el = document.getElementById('max_devices');
+                    if (plan === 'pro') el.value = 5;
+                    else if (plan === 'plus') el.value = 3;
+                    else if (plan === 'none') el.value = 1; // Assuming free tier has 1 device
+                }
+            </script>
         </div>
     </main>
 </body>

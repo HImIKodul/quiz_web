@@ -47,6 +47,7 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), default='user') 
     plan = db.Column(db.String(50), default='none')
     plan_expire_date = db.Column(db.DateTime, nullable=True)
+    max_devices = db.Column(db.Integer, default=3, nullable=True)
     active_session_token = db.Column(db.String(256), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -64,6 +65,14 @@ class UserDevice(db.Model):
     device_token = db.Column(db.String(256), nullable=False)
     device_name = db.Column(db.String(256), nullable=True)
     registered_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class PaymentRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    requested_plan = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(20), default='pending') # pending, approved, rejected
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User', backref=db.backref('payment_requests', lazy=True))
 
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -84,6 +93,12 @@ def load_user(user_id):
 
 # --- CREATE TEST ADMINS ---
 with app.app_context():
+    try:
+        db.session.execute(db.text("ALTER TABLE user ADD COLUMN max_devices INTEGER DEFAULT 3;"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        
     db.create_all()
     # 1. The Content Admin (Questions)
     if not User.query.filter_by(identifier='admin_content').first():
@@ -163,8 +178,9 @@ def login():
                 
             known_device = UserDevice.query.filter_by(user_id=user.id, device_token=device_id).first()
             if not known_device:
-                if UserDevice.query.filter_by(user_id=user.id).count() >= 3:
-                    flash('Та 3-аас олон төхөөрөмжөөс нэвтрэх боломжгүй. Админтай холбогдоно уу.')
+                limit = user.max_devices if user.max_devices is not None else 3
+                if UserDevice.query.filter_by(user_id=user.id).count() >= limit:
+                    flash(f'Та {limit}-аас олон төхөөрөмжөөс нэвтрэх боломжгүй. Админтай холбогдоно уу.')
                     return redirect(url_for('login'))
                 dev_name = f"{request.user_agent.browser} ({request.user_agent.platform})" if request.user_agent else "Unknown Device"
                 new_dev = UserDevice(user_id=user.id, device_token=device_id, device_name=dev_name)
@@ -330,8 +346,43 @@ def admin_billing():
     if current_user.role != 'billing_admin':
         return "Access Denied. You are not a Billing Admin.", 403
     
-    users = User.query.order_by(User.created_at.desc()).all()
-    return render_template('billing_admin.html', users=users)
+    search_str = request.args.get('search', '').strip()
+    query = User.query.order_by(User.created_at.desc())
+    if search_str:
+        query = query.filter(User.identifier.contains(search_str))
+        
+    users = query.all()
+    pending_reqs = PaymentRequest.query.filter_by(status='pending').order_by(PaymentRequest.created_at.asc()).all()
+    return render_template('billing_admin.html', users=users, pending_reqs=pending_reqs)
+
+@app.route('/admin/billing/approve/<int:req_id>', methods=['POST'])
+@login_required
+def admin_billing_approve(req_id):
+    if current_user.role != 'billing_admin':
+        return "Access Denied.", 403
+    req = PaymentRequest.query.get_or_404(req_id)
+    if req.status == 'pending':
+        req.status = 'approved'
+        u = User.query.get(req.user_id)
+        if u:
+            u.plan = req.requested_plan
+            u.max_devices = 5 if req.requested_plan == 'pro' else 3
+            u.plan_expire_date = datetime.utcnow() + timedelta(days=30)
+        db.session.commit()
+        flash(f'Амжилттай зөвшөөрсөн: {u.identifier if u else "Unknown"}')
+    return redirect(url_for('admin_billing'))
+
+@app.route('/admin/billing/reject/<int:req_id>', methods=['POST'])
+@login_required
+def admin_billing_reject(req_id):
+    if current_user.role != 'billing_admin':
+        return "Access Denied.", 403
+    req = PaymentRequest.query.get_or_404(req_id)
+    if req.status == 'pending':
+        req.status = 'rejected'
+        db.session.commit()
+        flash('Хүсэлтийг цуцаллаа.')
+    return redirect(url_for('admin_billing'))
 
 @app.route('/admin/billing/edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
@@ -345,6 +396,11 @@ def admin_billing_edit_user(user_id):
         u.name = request.form.get('name', u.name)
         u.role = request.form.get('role', u.role)
         u.plan = request.form.get('plan', u.plan)
+        
+        try:
+            u.max_devices = int(request.form.get('max_devices', u.max_devices or 3))
+        except ValueError:
+            pass
         
         expire_str = request.form.get('plan_expire_date', '')
         if expire_str:
@@ -372,6 +428,27 @@ def admin_billing_edit_user(user_id):
 @app.route('/subscriptions')
 def subscriptions():
     return render_template('subscriptions.html')
+
+@app.route('/payment/<plan>')
+@login_required
+def payment(plan):
+    if plan not in ['plus', 'pro']:
+        flash("Буруу багц байна.")
+        return redirect(url_for('subscriptions'))
+    return render_template('payment.html', plan=plan)
+
+@app.route('/payment/submit/<plan>', methods=['POST'])
+@login_required
+def payment_submit(plan):
+    if plan not in ['plus', 'pro']:
+        flash("Буруу багц байна.")
+        return redirect(url_for('subscriptions'))
+        
+    req = PaymentRequest(user_id=current_user.id, requested_plan=plan, status='pending')
+    db.session.add(req)
+    db.session.commit()
+    flash("Таны хүсэлтийг хүлээж авлаа. Админ шалгаж баталгаажуулсны дараа багц идэвхжих болно.")
+    return redirect(url_for('dashboard'))
 
 @app.route('/take_quiz')
 @login_required

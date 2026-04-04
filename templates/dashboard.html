@@ -46,7 +46,8 @@
 
         <div class="dashboard-stats" style="display: flex; gap: 2rem; flex-wrap: wrap;">
             <div class="card" style="flex: 1; min-width: 300px;">
-                <h3 style="margin-bottom: 1rem;">Идэвхтэй төхөөрөмжүүд: {{ devices|length }} / 3</h3>
+                {% set device_limit = current_user.max_devices if current_user.max_devices is not none else (5 if current_user.plan == 'pro' else (3 if current_user.plan == 'plus' else 1)) %}
+                <h3 style="margin-bottom: 1rem;">Идэвхтэй төхөөрөмжүүд: {{ devices|length }} / {{ device_limit }}</h3>
                 <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Төхөөрөмж устгах хэрэгтэй бол админтай холбогдоно уу.</p>
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                 {% for d in devices %}
@@ -72,8 +73,9 @@
                         <p style="margin-top: 1rem; color: var(--text-muted);">Тодорхойгүй хугацаатай</p>
                     {% endif %}
                 {% else %}
-                    <p style="color: var(--text-muted);">Танд идэвхтэй багц алга байна.</p>
-                    <a href="/subscriptions" class="btn" style="margin-top: 1rem; display: inline-block;">Багц авах</a>
+                    <p style="font-size: 1.1rem;">Төлөв: <span style="font-weight: bold; color: var(--text-muted);">ҮНЭГҮЙ БАГЦ (FREE TIER)</span></p>
+                    <p style="margin-top: 1rem;">Дуусах хугацаа: <br><strong style="font-size: 1.5rem; color: var(--text-muted);">-</strong></p>
+                    <a href="/subscriptions" class="btn" style="margin-top: 1rem; display: inline-block;">Багц ахих / Сунгах</a>
                 {% endif %}
             </div>
         </div>

@@ -19,6 +19,53 @@
             {% if messages %}<p style="color: #059669; margin-bottom: 1rem; font-weight: bold;">{{ messages[0] }}</p>{% endif %}
         {% endwith %}
 
+        <form method="GET" action="/admin/billing" style="margin-bottom: 1rem; display: flex; gap: 0.5rem; max-width: 400px;">
+            <input type="text" name="search" class="form-control" placeholder="Search by phone number..." value="{{ request.args.get('search', '') }}">
+            <button type="submit" class="btn" style="padding: 0.5rem 1rem;">Search</button>
+            {% if request.args.get('search') %}
+            <a href="/admin/billing" class="btn btn-outline" style="padding: 0.5rem 1rem;">Clear</a>
+            {% endif %}
+        </form>
+
+        {% if pending_reqs %}
+        <div class="card" style="margin-bottom: 2rem; border-left: 4px solid #f59e0b;">
+            <h3 style="margin-bottom: 1rem; color: #d97706;">Улзвар хүлээгдэж буй төлбөрийн хүсэлтүүд</h3>
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
+                        <th style="padding: 1rem;">Огноо</th>
+                        <th style="padding: 1rem;">Утасны дугаар</th>
+                        <th style="padding: 1rem;">Хүссэн багц</th>
+                        <th style="padding: 1rem; text-align: right;">Үйлдэл</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in pending_reqs %}
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 1rem; color: var(--text-muted);">{{ req.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td style="padding: 1rem; font-weight: 500;">
+                            {{ req.user.identifier if req.user else 'Unknown' }}
+                        </td>
+                        <td style="padding: 1rem;">
+                            <span style="background: #fef3c7; color: #b45309; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 600; text-transform: uppercase;">
+                                {{ req.requested_plan }}
+                            </span>
+                        </td>
+                        <td style="padding: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                            <form action="/admin/billing/approve/{{ req.id }}" method="POST" style="margin: 0;">
+                                <button type="submit" class="btn" style="background: #059669; padding: 0.4rem 1rem; font-size: 0.85rem;">Зөвшөөрөх</button>
+                            </form>
+                            <form action="/admin/billing/reject/{{ req.id }}" method="POST" style="margin: 0;">
+                                <button type="submit" class="btn btn-outline" style="border-color: #dc2626; color: #dc2626; padding: 0.4rem 1rem; font-size: 0.85rem;">Цуцлах</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
         <div class="card">
             <table style="width: 100%; border-collapse: collapse; text-align: left;">
                 <thead>
