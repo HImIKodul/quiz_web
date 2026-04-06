@@ -18,22 +18,26 @@ from flask_limiter.util import get_remote_address
 # ==========================================
 # APP CONFIGURATION
 # ==========================================
+# Absolute base directory (works on both local and PythonAnywhere)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'new_super_secret_key_to_clear_sessions')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///quiz_database.db'
+# Use absolute path for SQLite — required on PythonAnywhere to avoid disk I/O errors
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'quiz_database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
 
 # Upload config
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE
 
 # Backup config
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'quiz_database.db')
-BACKUP_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backups')
+DB_PATH = os.path.join(BASE_DIR, 'quiz_database.db')
+BACKUP_FOLDER = os.path.join(BASE_DIR, 'backups')
 MAX_BACKUPS = 10
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
