@@ -5,9 +5,49 @@
     <title>Content Admin | QuizPro</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
-        /* Hide all dynamic fields by default except the first one */
         .dynamic-field { display: none; margin-top: 15px; padding: 15px; background: #f9fafb; border-radius: 8px; border: 1px dashed #cbd5e1; }
         #mcq-fields { display: block; }
+
+        /* Image upload area */
+        .image-upload-box {
+            border: 2px dashed #6366f1;
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.2s;
+            background: #f5f3ff;
+            margin-top: 1rem;
+        }
+        .image-upload-box:hover { background: #ede9fe; }
+        .image-upload-box input[type="file"] { display: none; }
+        .image-upload-box label { cursor: pointer; color: #4f46e5; font-weight: 500; }
+        .image-preview {
+            margin-top: 1rem;
+            display: none;
+            position: relative;
+            width: fit-content;
+        }
+        .image-preview img {
+            max-height: 200px;
+            border-radius: 8px;
+            border: 2px solid #c7d2fe;
+        }
+        .image-preview .remove-preview {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: 13px;
+            cursor: pointer;
+            line-height: 22px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -19,14 +59,15 @@
     <main class="container">
         <h2>Add New Question</h2>
         <p style="color: #059669; font-weight: bold;">Total Questions: {{ total }}</p>
-        
+
         {% with messages = get_flashed_messages() %}
           {% if messages %}<p style="color: #059669; margin-bottom: 1rem;">{{ messages[0] }}</p>{% endif %}
         {% endwith %}
 
         <div class="card" style="max-width: 800px;">
-            <form action="/admin/content" method="POST">
-                
+            <form action="/admin/content" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
                 <div class="form-group">
                     <label>Question Type</label>
                     <select name="q_type" id="q_type" class="form-control" style="border-color: #4f46e5;">
@@ -41,6 +82,20 @@
                 <div class="form-group">
                     <label>Question Text</label>
                     <textarea name="question_text" class="form-control" rows="3" required></textarea>
+                </div>
+
+                <!-- IMAGE UPLOAD (available for all question types) -->
+                <div class="form-group">
+                    <label>Question Image <span style="color: var(--text-muted); font-weight: 400;">(optional — JPG, PNG, GIF, WEBP · max 5MB)</span></label>
+                    <div class="image-upload-box" id="uploadBox">
+                        <input type="file" name="question_image" id="question_image" accept="image/jpeg,image/png,image/gif,image/webp">
+                        <label for="question_image">📷 Click to select an image</label>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">Supports JPG, PNG, GIF, WEBP</p>
+                    </div>
+                    <div class="image-preview" id="imagePreview">
+                        <img id="previewImg" src="" alt="Preview">
+                        <button type="button" class="remove-preview" id="removePreview" title="Remove image">×</button>
+                    </div>
                 </div>
 
                 <div id="mcq-fields" class="dynamic-field">
@@ -94,6 +149,7 @@
                 <button type="submit" class="btn" style="background-color: #059669; margin-top: 20px;">Save Question</button>
             </form>
         </div>
+
         <div class="card" style="margin-top: 3rem;">
             <h2>Search & Manage Questions</h2>
             <form action="/admin/content" method="GET" style="display: flex; gap: 1rem; align-items: center; margin: 1.5rem 0; flex-wrap: wrap;">
@@ -117,6 +173,7 @@
                     <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
                         <th style="padding: 1rem; font-weight: 600;">Date</th>
                         <th style="padding: 1rem; font-weight: 600;">Type</th>
+                        <th style="padding: 1rem; font-weight: 600;">Image</th>
                         <th style="padding: 1rem; font-weight: 600;">Question Content</th>
                         <th style="padding: 1rem; font-weight: 600; text-align: right;">Action</th>
                     </tr>
@@ -126,17 +183,25 @@
                     <tr style="border-bottom: 1px solid var(--border);">
                         <td style="padding: 1rem; color: var(--text-muted);">{{ q.created_at.strftime('%Y-%m-%d') if q.created_at else 'Unknown' }}</td>
                         <td style="padding: 1rem;"><span style="background: var(--bg-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85rem;">{{ q.q_type | upper }}</span></td>
-                        <td style="padding: 1rem;">{{ q.question_text[:50] }}...</td>
+                        <td style="padding: 1rem;">
+                            {% if q.image_filename %}
+                                <img src="{{ url_for('static', filename='uploads/' + q.image_filename) }}" alt="Q image" style="height: 40px; border-radius: 4px; border: 1px solid var(--border);">
+                            {% else %}
+                                <span style="color: var(--text-muted); font-size: 0.8rem;">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 1rem;">{{ q.question_text[:60] }}...</td>
                         <td style="padding: 1rem; text-align: right; display: flex; gap: 0.5rem; justify-content: flex-end;">
                             <a href="/admin/content/edit/{{ q.id }}" class="btn" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Edit</a>
                             <form action="/admin/content/delete/{{ q.id }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to permanently delete this question?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-outline" style="padding: 0.4rem 1rem; font-size: 0.85rem; border-color: #dc2626; color: #dc2626;">Delete</button>
                             </form>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" style="padding: 2rem; text-align: center; color: var(--text-muted);">No questions found.</td>
+                        <td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-muted);">No questions found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -145,6 +210,7 @@
     </main>
 
     <script>
+        // Question type switcher
         const typeSelect = document.getElementById('q_type');
         const fields = {
             'mcq': document.getElementById('mcq-fields'),
@@ -153,12 +219,32 @@
             'numeric': document.getElementById('numeric-fields'),
             'matching': document.getElementById('matching-fields')
         };
-
         typeSelect.addEventListener('change', function() {
-            // Hide all fields
             for (let key in fields) { fields[key].style.display = 'none'; }
-            // Show the selected one
             fields[this.value].style.display = 'block';
+        });
+
+        // Image preview
+        const imgInput = document.getElementById('question_image');
+        const preview = document.getElementById('imagePreview');
+        const previewImg = document.getElementById('previewImg');
+        const removeBtn = document.getElementById('removePreview');
+
+        imgInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    previewImg.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(this.files[0]);
+            }
+        });
+
+        removeBtn.addEventListener('click', function() {
+            imgInput.value = '';
+            previewImg.src = '';
+            preview.style.display = 'none';
         });
     </script>
 </body>

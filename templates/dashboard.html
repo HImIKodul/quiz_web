@@ -114,6 +114,58 @@
             {% endif %}
         </div>
 
+        <!-- ── SUBSCRIPTION HISTORY ── -->
+        <div class="card" style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem;">Миний захиалгын түүх</h3>
+            {% if sub_history %}
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
+                            <th style="padding: 0.8rem;">Огноо</th>
+                            <th style="padding: 0.8rem;">Үйлдэл</th>
+                            <th style="padding: 0.8rem;">Багц</th>
+                            <th style="padding: 0.8rem;">Тэмдэглэл</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in sub_history %}
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 0.8rem; color: var(--text-muted); white-space: nowrap;">{{ s.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td style="padding: 0.8rem;">
+                                {% if s.action == 'approved' %}
+                                    <span style="background:#d1fae5; color:#065f46; padding:0.2rem 0.6rem; border-radius:999px; font-size:0.78rem; font-weight:600;">✓ Зөвшөөрөгдсөн</span>
+                                {% elif s.action == 'rejected' %}
+                                    <span style="background:#fee2e2; color:#991b1b; padding:0.2rem 0.6rem; border-radius:999px; font-size:0.78rem; font-weight:600;">✗ Цуцлагдсан</span>
+                                {% elif s.action == 'requested' %}
+                                    <span style="background:#dbeafe; color:#1e40af; padding:0.2rem 0.6rem; border-radius:999px; font-size:0.78rem; font-weight:600;">⏳ Хүсэлт илгээсэн</span>
+                                {% elif s.action == 'expired' %}
+                                    <span style="background:#ffedd5; color:#9a3412; padding:0.2rem 0.6rem; border-radius:999px; font-size:0.78rem; font-weight:600;">⏰ Дуусгавар болсон</span>
+                                {% elif s.action == 'admin_edit' %}
+                                    <span style="background:#ede9fe; color:#5b21b6; padding:0.2rem 0.6rem; border-radius:999px; font-size:0.78rem; font-weight:600;">✎ Админ өөрчилсөн</span>
+                                {% else %}
+                                    <span style="background:#f3f4f6; color:#374151; padding:0.2rem 0.6rem; border-radius:999px; font-size:0.78rem; font-weight:600;">{{ s.action }}</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 0.8rem;">
+                                {% if s.plan == 'pro' %}
+                                    <span style="background:#ede9fe; color:#5b21b6; padding:0.2rem 0.6rem; border-radius:4px; font-size:0.8rem; font-weight:600;">PRO</span>
+                                {% elif s.plan == 'plus' %}
+                                    <span style="background:#dbeafe; color:#1e40af; padding:0.2rem 0.6rem; border-radius:4px; font-size:0.8rem; font-weight:600;">PLUS</span>
+                                {% elif s.plan %}
+                                    <span style="background:#f3f4f6; color:#374151; padding:0.2rem 0.6rem; border-radius:4px; font-size:0.8rem;">{{ s.plan | upper }}</span>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td style="padding: 0.8rem; color: var(--text-muted); font-size: 0.82rem;">{{ s.note or '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <p style="color: var(--text-muted);">Захиалгын түүх байхгүй байна.</p>
+            {% endif %}
+        </div>
 
     </main>
 </body>

@@ -12,6 +12,7 @@
         </div>
         <h2 style="text-align: center; margin-bottom: 1.5rem;">Хэрэглэгч үүсгэх</h2>
         <form method="POST" action="/signup">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label>Хэрэглэгчийн нэр</label>
                 <input type="text" name="name" class="form-control" required placeholder="Бат Мөнх(Bat Munkh)">

@@ -20,6 +20,7 @@
             <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">Joined: {{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else 'Unknown' }}</p>
             
             <form action="/admin/billing/edit_user/{{ u.id }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group" style="margin-top: 1.5rem;">
                     <label>User's Full Name</label>
                     <input type="text" name="name" class="form-control" value="{{ u.name }}" required>

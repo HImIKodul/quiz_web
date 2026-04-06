@@ -4,6 +4,55 @@
     <meta charset="UTF-8">
     <title>Edit Question | QuizPro Admin</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .image-upload-box {
+            border: 2px dashed #6366f1;
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.2s;
+            background: #f5f3ff;
+            margin-top: 0.5rem;
+        }
+        .image-upload-box:hover { background: #ede9fe; }
+        .image-upload-box input[type="file"] { display: none; }
+        .image-upload-box label { cursor: pointer; color: #4f46e5; font-weight: 500; }
+
+        .existing-image {
+            margin-top: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+        }
+        .existing-image img {
+            max-height: 100px;
+            border-radius: 6px;
+            border: 1px solid #86efac;
+        }
+        .image-new-preview {
+            margin-top: 0.75rem;
+            display: none;
+        }
+        .image-new-preview img {
+            max-height: 160px;
+            border-radius: 8px;
+            border: 2px solid #c7d2fe;
+        }
+        .remove-check-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #dc2626;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 0.5rem;
+        }
+    </style>
 </head>
 <body>
     <header style="border-bottom: 1px solid #fee2e2;">
@@ -14,14 +63,49 @@
     <main class="container">
         <h2 style="margin-bottom: 1rem;">Асуулт өөрчлөх</h2>
         <a href="/admin/content" style="color: var(--primary); text-decoration: none; font-weight: 500;">&larr; Админ хуудас-руу буцах</a>
-        
+
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}<p style="color: #059669; margin: 1rem 0;">{{ messages[0] }}</p>{% endif %}
+        {% endwith %}
+
         <div class="card" style="max-width: 800px; margin-top: 2rem;">
             <p style="color: var(--text-muted); margin-bottom: 1rem;">Асуултын төрөл: <strong>{{ q.q_type | upper }}</strong></p>
-            
-            <form action="/admin/content/edit/{{ q.id }}" method="POST">
+
+            <form action="/admin/content/edit/{{ q.id }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
                 <div class="form-group">
                     <label>Question Text</label>
                     <textarea name="question_text" class="form-control" rows="3" required>{{ q.question_text }}</textarea>
+                </div>
+
+                <!-- IMAGE SECTION -->
+                <div class="form-group">
+                    <label>Question Image <span style="color: var(--text-muted); font-weight: 400;">(JPG, PNG, GIF, WEBP · max 5MB)</span></label>
+
+                    {% if q.image_filename %}
+                    <!-- Show existing image -->
+                    <div class="existing-image" id="existingImageBox">
+                        <img src="{{ url_for('static', filename='uploads/' + q.image_filename) }}" alt="Current image">
+                        <div>
+                            <p style="margin: 0; font-weight: 500; color: #15803d;">Current image</p>
+                            <label class="remove-check-label">
+                                <input type="checkbox" name="remove_image" value="1" id="removeImageCheck">
+                                Remove this image
+                            </label>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Upload a new image below to replace the current one:</p>
+                    {% endif %}
+
+                    <div class="image-upload-box">
+                        <input type="file" name="question_image" id="question_image" accept="image/jpeg,image/png,image/gif,image/webp">
+                        <label for="question_image">📷 {{ 'Choose replacement image' if q.image_filename else 'Click to select an image' }}</label>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">Optional</p>
+                    </div>
+                    <div class="image-new-preview" id="newPreview">
+                        <img id="newPreviewImg" src="" alt="New image preview">
+                    </div>
                 </div>
 
                 {% if q.q_type == 'mcq' %}
@@ -83,6 +167,7 @@
                     <label>Тохирох хариулт 4</label>
                     <input type="text" name="match_4" class="form-control" value="{{ q.option_d or '' }}">
                 </div>
+
                 {% elif q.q_type == 'multi_select' %}
                 <div class="form-group">
                     <p style="margin-bottom: 0.5rem;">Multi-Select Options (Check correct answers)</p>
@@ -105,5 +190,34 @@
             </form>
         </div>
     </main>
+
+    <script>
+        // New image preview
+        const imgInput = document.getElementById('question_image');
+        const newPreview = document.getElementById('newPreview');
+        const newPreviewImg = document.getElementById('newPreviewImg');
+
+        if (imgInput) {
+            imgInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        newPreviewImg.src = e.target.result;
+                        newPreview.style.display = 'block';
+                    };
+                    reader.readAsDataURL(this.files[0]);
+                }
+            });
+        }
+
+        // If remove checkbox checked, hide the existing image box
+        const removeCheck = document.getElementById('removeImageCheck');
+        const existingBox = document.getElementById('existingImageBox');
+        if (removeCheck && existingBox) {
+            removeCheck.addEventListener('change', function() {
+                existingBox.style.opacity = this.checked ? '0.4' : '1';
+            });
+        }
+    </script>
 </body>
 </html>

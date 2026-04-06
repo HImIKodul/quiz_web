@@ -4,6 +4,93 @@
     <meta charset="UTF-8">
     <title>Billing Admin | QuizPro</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* ── Tab navigation ── */
+        .tab-nav {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0;
+        }
+        .tab-btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            background: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            border-radius: 4px 4px 0 0;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: #eff6ff;
+        }
+        .tab-btn:hover:not(.active) { background: var(--bg-color); }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ── Badge styles for log actions ── */
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        .badge-green  { background: #d1fae5; color: #065f46; }
+        .badge-red    { background: #fee2e2; color: #991b1b; }
+        .badge-blue   { background: #dbeafe; color: #1e40af; }
+        .badge-orange { background: #ffedd5; color: #9a3412; }
+        .badge-purple { background: #ede9fe; color: #5b21b6; }
+        .badge-gray   { background: #f3f4f6; color: #374151; }
+
+        /* ── Backup section ── */
+        .backup-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            padding: 1.25rem 1.5rem;
+            background: linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%);
+            border-radius: 12px;
+            color: white;
+            margin-bottom: 2rem;
+        }
+        .backup-card-info h4 { margin: 0 0 0.25rem; font-size: 1rem; }
+        .backup-card-info p  { margin: 0; font-size: 0.85rem; opacity: 0.8; }
+        .backup-download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.2rem;
+            background: rgba(255,255,255,0.15);
+            border: 1.5px solid rgba(255,255,255,0.4);
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+        .backup-download-btn:hover { background: rgba(255,255,255,0.25); }
+
+        /* ── Log table ── */
+        .log-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        .log-table th { padding: 0.75rem 1rem; font-weight: 600; text-align: left; border-bottom: 2px solid var(--border); background: var(--bg-color); }
+        .log-table td { padding: 0.65rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        .log-table tr:hover td { background: #f8faff; }
+        .ip-chip { background: #f3f4f6; padding: 0.15rem 0.5rem; border-radius: 4px; font-family: monospace; font-size: 0.8rem; }
+    </style>
 </head>
 <body>
     <header style="border-bottom: 1px solid #fee2e2;">
@@ -12,94 +99,319 @@
     </header>
 
     <main class="container">
-        <h2>User Management</h2>
-        <p style="color: var(--text-muted); margin-bottom: 2rem;">Manage active subscriptions and user accounts.</p>
-        
+        <h2>Billing Admin Dashboard</h2>
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Manage subscriptions, users, and system activity.</p>
+
         {% with messages = get_flashed_messages() %}
             {% if messages %}<p style="color: #059669; margin-bottom: 1rem; font-weight: bold;">{{ messages[0] }}</p>{% endif %}
         {% endwith %}
 
-        <form method="GET" action="/admin/billing" style="margin-bottom: 1rem; display: flex; gap: 0.5rem; max-width: 400px;">
-            <input type="text" name="search" class="form-control" placeholder="Search by phone number..." value="{{ request.args.get('search', '') }}">
-            <button type="submit" class="btn" style="padding: 0.5rem 1rem;">Search</button>
-            {% if request.args.get('search') %}
-            <a href="/admin/billing" class="btn btn-outline" style="padding: 0.5rem 1rem;">Clear</a>
-            {% endif %}
-        </form>
-
-        {% if pending_reqs %}
-        <div class="card" style="margin-bottom: 2rem; border-left: 4px solid #f59e0b;">
-            <h3 style="margin-bottom: 1rem; color: #d97706;">Улзвар хүлээгдэж буй төлбөрийн хүсэлтүүд</h3>
-            <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                <thead>
-                    <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
-                        <th style="padding: 1rem;">Огноо</th>
-                        <th style="padding: 1rem;">Утасны дугаар</th>
-                        <th style="padding: 1rem;">Хүссэн багц</th>
-                        <th style="padding: 1rem; text-align: right;">Үйлдэл</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for req in pending_reqs %}
-                    <tr style="border-bottom: 1px solid var(--border);">
-                        <td style="padding: 1rem; color: var(--text-muted);">{{ req.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                        <td style="padding: 1rem; font-weight: 500;">
-                            {{ req.user.identifier if req.user else 'Unknown' }}
-                        </td>
-                        <td style="padding: 1rem;">
-                            <span style="background: #fef3c7; color: #b45309; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 600; text-transform: uppercase;">
-                                {{ req.requested_plan }}
-                            </span>
-                        </td>
-                        <td style="padding: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
-                            <form action="/admin/billing/approve/{{ req.id }}" method="POST" style="margin: 0;">
-                                <button type="submit" class="btn" style="background: #059669; padding: 0.4rem 1rem; font-size: 0.85rem;">Зөвшөөрөх</button>
-                            </form>
-                            <form action="/admin/billing/reject/{{ req.id }}" method="POST" style="margin: 0;">
-                                <button type="submit" class="btn btn-outline" style="border-color: #dc2626; color: #dc2626; padding: 0.4rem 1rem; font-size: 0.85rem;">Цуцлах</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-
-        <div class="card">
-            <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                <thead>
-                    <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
-                        <th style="padding: 1rem; font-weight: 600;">Sign-up Date</th>
-                        <th style="padding: 1rem; font-weight: 600;">Name</th>
-                        <th style="padding: 1rem; font-weight: 600;">Phone / Identifier</th>
-                        <th style="padding: 1rem; font-weight: 600;">Plan</th>
-                        <th style="padding: 1rem; font-weight: 600; text-align: right;">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for u in users %}
-                    <tr style="border-bottom: 1px solid var(--border);">
-                        <td style="padding: 1rem; color: var(--text-muted);">{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else 'Unknown' }}</td>
-                        <td style="padding: 1rem; font-weight: 500;">{{ u.name }}</td>
-                        <td style="padding: 1rem;">{{ u.identifier }}</td>
-                        <td style="padding: 1rem;">
-                            <span style="background: var(--bg-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85rem; text-transform: uppercase;">
-                                {{ u.plan }}
-                            </span>
-                        </td>
-                        <td style="padding: 1rem; text-align: right;">
-                            <a href="/admin/billing/edit_user/{{ u.id }}" class="btn btn-outline" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Edit User</a>
-                        </td>
-                    </tr>
+        <!-- ── BACKUP CARD ── -->
+        <div class="backup-card">
+            <div class="backup-card-info">
+                <h4>🛡️ Database Backup</h4>
+                <p>
+                    {{ backup_count }} backup(s) saved locally in <code style="background:rgba(255,255,255,0.15); padding:0.1rem 0.4rem; border-radius:4px;">backups/</code> folder.
+                    {% if latest_backup %}
+                    Latest: <strong>{{ latest_backup }}</strong>
                     {% else %}
-                    <tr>
-                        <td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-muted);">No users found.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    No backups yet — restart the server to create one.
+                    {% endif %}
+                </p>
+            </div>
+            <a href="/admin/billing/download_backup" class="backup-download-btn">
+                ⬇ Download Live DB
+            </a>
         </div>
+
+        <!-- ── TAB NAVIGATION ── -->
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('tab-users', this)">👥 Users</button>
+            <button class="tab-btn" onclick="switchTab('tab-pending', this)">
+                ⏳ Pending Requests
+                {% if pending_reqs %}<span style="background:#ef4444; color:white; border-radius:999px; padding:0.1rem 0.5rem; font-size:0.75rem; margin-left:0.3rem;">{{ pending_reqs|length }}</span>{% endif %}
+            </button>
+            <button class="tab-btn" onclick="switchTab('tab-subhistory', this)">📋 Subscription History</button>
+            <button class="tab-btn" onclick="switchTab('tab-actlog', this)">🔍 Activity Log</button>
+        </div>
+
+        <!-- ══════════════════════════════════════════
+             TAB 1: USER MANAGEMENT
+        ══════════════════════════════════════════ -->
+        <div id="tab-users" class="tab-panel active">
+            <form method="GET" action="/admin/billing" style="margin-bottom: 1rem; display: flex; gap: 0.5rem; max-width: 400px;">
+                <input type="text" name="search" class="form-control" placeholder="Search by phone number..." value="{{ request.args.get('search', '') }}">
+                <button type="submit" class="btn" style="padding: 0.5rem 1rem;">Search</button>
+                {% if request.args.get('search') %}
+                <a href="/admin/billing" class="btn btn-outline" style="padding: 0.5rem 1rem;">Clear</a>
+                {% endif %}
+            </form>
+
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
+                            <th style="padding: 1rem; font-weight: 600;">Sign-up Date</th>
+                            <th style="padding: 1rem; font-weight: 600;">Name</th>
+                            <th style="padding: 1rem; font-weight: 600;">Phone / Identifier</th>
+                            <th style="padding: 1rem; font-weight: 600;">Plan</th>
+                            <th style="padding: 1rem; font-weight: 600; text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 1rem; color: var(--text-muted);">{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else 'Unknown' }}</td>
+                            <td style="padding: 1rem; font-weight: 500;">{{ u.name }}</td>
+                            <td style="padding: 1rem;">{{ u.identifier }}</td>
+                            <td style="padding: 1rem;">
+                                {% if u.plan == 'pro' %}
+                                    <span class="badge badge-purple">PRO</span>
+                                {% elif u.plan == 'plus' %}
+                                    <span class="badge badge-blue">PLUS</span>
+                                {% else %}
+                                    <span class="badge badge-gray">FREE</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 1rem; text-align: right;">
+                                <a href="/admin/billing/edit_user/{{ u.id }}" class="btn btn-outline" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Edit User</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-muted);">No users found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════
+             TAB 2: PENDING PAYMENT REQUESTS
+        ══════════════════════════════════════════ -->
+        <div id="tab-pending" class="tab-panel">
+            {% if pending_reqs %}
+            <div class="card" style="border-left: 4px solid #f59e0b; padding: 0; overflow: hidden;">
+                <div style="padding: 1rem 1.5rem; background: #fffbeb;">
+                    <h3 style="color: #d97706; margin: 0;">Улзвар хүлээгдэж буй төлбөрийн хүсэлтүүд</h3>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
+                            <th style="padding: 1rem;">Огноо</th>
+                            <th style="padding: 1rem;">Утасны дугаар</th>
+                            <th style="padding: 1rem;">Хүссэн багц</th>
+                            <th style="padding: 1rem; text-align: right;">Үйлдэл</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in pending_reqs %}
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 1rem; color: var(--text-muted);">{{ req.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td style="padding: 1rem; font-weight: 500;">{{ req.user.identifier if req.user else 'Unknown' }}</td>
+                            <td style="padding: 1rem;">
+                                <span class="badge {% if req.requested_plan == 'pro' %}badge-purple{% else %}badge-blue{% endif %}">
+                                    {{ req.requested_plan | upper }}
+                                </span>
+                            </td>
+                            <td style="padding: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                <form action="/admin/billing/approve/{{ req.id }}" method="POST" style="margin: 0;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn" style="background: #059669; padding: 0.4rem 1rem; font-size: 0.85rem;">Зөвшөөрөх</button>
+                                </form>
+                                <form action="/admin/billing/reject/{{ req.id }}" method="POST" style="margin: 0;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline" style="border-color: #dc2626; color: #dc2626; padding: 0.4rem 1rem; font-size: 0.85rem;">Цуцлах</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card" style="text-align: center; padding: 3rem;">
+                <p style="color: var(--text-muted); font-size: 1.1rem;">✅ Хүлээгдэж буй хүсэлт байхгүй байна.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ══════════════════════════════════════════
+             TAB 3: SUBSCRIPTION HISTORY
+        ══════════════════════════════════════════ -->
+        <div id="tab-subhistory" class="tab-panel">
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--bg-color);">
+                    <h3 style="margin: 0; font-size: 1rem;">All Subscription Changes — Latest 200</h3>
+                </div>
+                <div style="overflow-x: auto;">
+                <table class="log-table">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>User</th>
+                            <th>Action</th>
+                            <th>Plan</th>
+                            <th>Changed By</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in sub_history %}
+                        <tr>
+                            <td style="color: var(--text-muted); white-space: nowrap;">{{ s.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td style="font-weight: 500;">{{ s.user.identifier if s.user else ('ID:' ~ s.user_id) }}</td>
+                            <td>
+                                {% if s.action == 'approved' %}
+                                    <span class="badge badge-green">✓ Approved</span>
+                                {% elif s.action == 'rejected' %}
+                                    <span class="badge badge-red">✗ Rejected</span>
+                                {% elif s.action == 'requested' %}
+                                    <span class="badge badge-blue">⏳ Requested</span>
+                                {% elif s.action == 'expired' %}
+                                    <span class="badge badge-orange">⏰ Expired</span>
+                                {% elif s.action == 'admin_edit' %}
+                                    <span class="badge badge-purple">✎ Admin Edit</span>
+                                {% else %}
+                                    <span class="badge badge-gray">{{ s.action }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if s.plan %}
+                                <span class="badge {% if s.plan == 'pro' %}badge-purple{% elif s.plan == 'plus' %}badge-blue{% else %}badge-gray{% endif %}">
+                                    {{ s.plan | upper }}
+                                </span>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td style="color: var(--text-muted);">{{ s.changed_by or '—' }}</td>
+                            <td style="color: var(--text-muted); font-size: 0.82rem; max-width: 220px;">{{ s.note or '—' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" style="padding: 2rem; text-align: center; color: var(--text-muted);">No subscription history yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════
+             TAB 4: ACTIVITY LOG
+        ══════════════════════════════════════════ -->
+        <div id="tab-actlog" class="tab-panel">
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--bg-color); display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1rem;">System Activity Log — Latest 200 Entries</h3>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted);">Filter:</label>
+                        <select id="logFilter" class="form-control" style="width: auto; padding: 0.3rem 0.6rem; font-size: 0.85rem;" onchange="filterLogs(this.value)">
+                            <option value="all">All Actions</option>
+                            <option value="login">Logins</option>
+                            <option value="login_failed">Failed Logins</option>
+                            <option value="logout">Logouts</option>
+                            <option value="signup">Signups</option>
+                            <option value="question">Questions</option>
+                            <option value="subscription">Subscriptions</option>
+                            <option value="backup">Backups</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="overflow-x: auto;">
+                <table class="log-table" id="activityTable">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>User</th>
+                            <th>Action</th>
+                            <th>Details</th>
+                            <th>IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in activity_logs %}
+                        <tr data-action="{{ log.action }}">
+                            <td style="color: var(--text-muted); white-space: nowrap;">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td style="font-weight: 500;">{{ log.user_identifier or '—' }}</td>
+                            <td>
+                                {% if log.action == 'login' %}
+                                    <span class="badge badge-green">🔑 Login</span>
+                                {% elif log.action == 'login_failed' %}
+                                    <span class="badge badge-red">⚠ Failed Login</span>
+                                {% elif log.action == 'login_blocked' %}
+                                    <span class="badge badge-red">🚫 Blocked</span>
+                                {% elif log.action == 'logout' %}
+                                    <span class="badge badge-gray">↩ Logout</span>
+                                {% elif log.action == 'signup' %}
+                                    <span class="badge badge-blue">✚ Signup</span>
+                                {% elif log.action == 'question_added' %}
+                                    <span class="badge badge-purple">+ Question</span>
+                                {% elif log.action == 'question_edited' %}
+                                    <span class="badge badge-orange">✎ Question Edit</span>
+                                {% elif log.action == 'question_deleted' %}
+                                    <span class="badge badge-red">✕ Question Del</span>
+                                {% elif log.action == 'subscription_approved' %}
+                                    <span class="badge badge-green">✓ Sub Approved</span>
+                                {% elif log.action == 'subscription_rejected' %}
+                                    <span class="badge badge-red">✗ Sub Rejected</span>
+                                {% elif log.action == 'subscription_requested' %}
+                                    <span class="badge badge-blue">⏳ Sub Request</span>
+                                {% elif log.action == 'subscription_expired' %}
+                                    <span class="badge badge-orange">⏰ Sub Expired</span>
+                                {% elif log.action == 'user_plan_edited' %}
+                                    <span class="badge badge-purple">✎ Plan Edit</span>
+                                {% elif log.action == 'user_edited' %}
+                                    <span class="badge badge-gray">✎ User Edit</span>
+                                {% elif log.action == 'backup_downloaded' %}
+                                    <span class="badge badge-blue">⬇ Backup DL</span>
+                                {% else %}
+                                    <span class="badge badge-gray">{{ log.action }}</span>
+                                {% endif %}
+                            </td>
+                            <td style="color: var(--text-muted); max-width: 260px; font-size: 0.82rem;">{{ log.details or '—' }}</td>
+                            <td><span class="ip-chip">{{ log.ip_address or '—' }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-muted);">No activity logged yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+
     </main>
+
+    <script>
+        // Tab switching
+        function switchTab(panelId, btn) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(panelId).classList.add('active');
+            btn.classList.add('active');
+        }
+
+        // Activity log filter
+        function filterLogs(value) {
+            const rows = document.querySelectorAll('#activityTable tbody tr[data-action]');
+            rows.forEach(row => {
+                const action = row.dataset.action || '';
+                let show = false;
+                if (value === 'all') show = true;
+                else if (value === 'login')        show = action === 'login';
+                else if (value === 'login_failed') show = action === 'login_failed' || action === 'login_blocked';
+                else if (value === 'logout')       show = action === 'logout';
+                else if (value === 'signup')       show = action === 'signup';
+                else if (value === 'question')     show = action.startsWith('question_');
+                else if (value === 'subscription') show = action.startsWith('subscription_') || action === 'user_plan_edited';
+                else if (value === 'backup')       show = action === 'backup_downloaded';
+                row.style.display = show ? '' : 'none';
+            });
+        }
+    </script>
 </body>
 </html>
