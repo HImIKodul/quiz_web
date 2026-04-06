@@ -83,6 +83,54 @@
         <p class="sub">Return focus to the exam to continue.</p>
     </div>
 
+    {% if timer_seconds and timer_seconds > 0 %}
+    <div id="timer-bar" style="position:sticky;top:0;z-index:100;background:#1e1b4b;color:white;padding:0.6rem 1.5rem;display:flex;align-items:center;gap:1rem;font-weight:700;font-size:1.05rem;">
+        <span>⏱</span>
+        <div style="flex:1;background:rgba(255,255,255,0.2);border-radius:999px;height:8px;overflow:hidden;">
+            <div id="timer-progress" style="height:100%;background:#a5f3fc;border-radius:999px;transition:width 1s linear;width:100%;"></div>
+        </div>
+        <span id="timer-display">--:--</span>
+    </div>
+    <script id="timer-config" type="application/json">
+        {
+            "seconds": {{ timer_seconds }}
+        }
+    </script>
+    <script>
+    (function(){
+        const config = JSON.parse(document.getElementById('timer-config').textContent);
+        const TOTAL = config.seconds;
+        const KEY = 'quiz_timer_end';
+        let endTime = sessionStorage.getItem(KEY);
+        if (!endTime || Date.now() > parseInt(endTime)) {
+            endTime = Date.now() + TOTAL * 1000;
+            sessionStorage.setItem(KEY, endTime);
+        }
+        endTime = parseInt(endTime);
+        const bar = document.getElementById('timer-bar');
+        const progress = document.getElementById('timer-progress');
+        const display = document.getElementById('timer-display');
+        function tick() {
+            const left = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+            const pct = Math.min(100, (left / TOTAL) * 100);
+            const m = String(Math.floor(left/60)).padStart(2,'0');
+            const s = String(left % 60).padStart(2,'0');
+            display.textContent = m + ':' + s;
+            progress.style.width = pct + '%';
+            if (pct < 10) { bar.style.background='#991b1b'; progress.style.background='#fca5a5'; }
+            else if (pct < 25) { bar.style.background='#92400e'; progress.style.background='#fcd34d'; }
+            if (left <= 0) {
+                sessionStorage.removeItem(KEY);
+                document.querySelector('form[action="/submit_quiz"]')?.submit();
+                return;
+            }
+            setTimeout(tick, 1000);
+        }
+        tick();
+    })();
+    </script>
+    {% endif %}
+
     <header style="border-bottom: 1px solid var(--border);">
         <a href="/" class="logo">
             <img src="{{ url_for('static', filename='mata_logo.jpeg') }}" alt="MATA Logo" style="height: 40px; width: auto;">
@@ -91,6 +139,7 @@
             <a href="/dashboard">Асуултаас гарах</a>
         </nav>
     </header>
+
 
     <main class="quiz-container" style="padding: 3rem 5%;">
         <div style="text-align: center; margin-bottom: 3rem;">
@@ -258,8 +307,11 @@
         // ============================================
         document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.shuffle-opts').forEach(wrapper => {
-                for (let i = wrapper.children.length; i >= 0; i--) {
-                    wrapper.appendChild(wrapper.children[Math.random() * i | 0]);
+                const children = Array.from(wrapper.children);
+                // Fisher-Yates Shuffle
+                for (let i = children.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    wrapper.appendChild(children[j]);
                 }
                 const letters = ['A', 'B', 'C', 'D', 'E'];
                 Array.from(wrapper.children).forEach((child, index) => {

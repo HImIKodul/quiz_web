@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Study Mode | MATA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { display:flex; flex-direction:column; min-height:100vh; }
+        .study-layout { display:flex; flex:1; gap:0; }
+
+        /* Sidebar */
+        #study-sidebar {
+            width:220px; min-width:220px; background:var(--card-bg);
+            border-right:1px solid var(--border); height:calc(100vh - 65px);
+            position:sticky; top:65px; overflow-y:auto; padding:1rem 0;
+        }
+        .sidebar-topic { padding:0.5rem 1rem; font-weight:700; font-size:0.75rem;
+            text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted);
+            background:var(--bg-color); margin-top:0.5rem; }
+        .sidebar-item {
+            display:flex; align-items:center; gap:0.5rem;
+            padding:0.5rem 1rem; cursor:pointer; font-size:0.88rem;
+            border-left:3px solid transparent; transition:all 0.15s;
+            color:var(--text-color);
+        }
+        .sidebar-item:hover { background:var(--bg-color); }
+        .sidebar-item.active { border-left-color:var(--primary); color:var(--primary); font-weight:600; background:var(--bg-color); }
+        .sidebar-item.answered-correct .dot { background:#059669; }
+        .sidebar-item.answered-wrong .dot { background:#dc2626; }
+        .dot { width:8px; height:8px; border-radius:50%; background:#d1d5db; flex-shrink:0; }
+
+        /* Main content */
+        #study-main { flex:1; padding:2rem; max-width:800px; }
+        .study-card { background:var(--card-bg); border-radius:12px; border:1px solid var(--border);
+            padding:2rem; margin-bottom:1.5rem; }
+        .study-progress { background:var(--bg-color); border-radius:999px; height:8px; margin-bottom:1.5rem; overflow:hidden; }
+        .study-progress-bar { height:100%; background:var(--primary); border-radius:999px; transition:width 0.3s; }
+
+        /* Options */
+        .study-option { display:flex; align-items:center; gap:0.75rem; padding:0.9rem 1rem;
+            border:2px solid var(--border); border-radius:8px; cursor:pointer; margin-bottom:0.6rem;
+            transition:all 0.15s; font-size:0.95rem; }
+        .study-option:hover { border-color:var(--primary); background:var(--bg-color); }
+        .study-option.correct-opt { border-color:#059669; background:#f0fdf4; color:#065f46; }
+        .study-option.wrong-opt   { border-color:#dc2626; background:#fef2f2; color:#991b1b; }
+        .study-option.revealed    { pointer-events:none; }
+        .opt-letter { font-weight:700; min-width:24px; }
+
+        /* Feedback */
+        .feedback-box { padding:1rem 1.25rem; border-radius:8px; margin-top:1rem; font-weight:600; display:none; }
+        .feedback-correct { background:#d1fae5; color:#065f46; }
+        .feedback-wrong   { background:#fee2e2; color:#991b1b; }
+
+        /* Nav buttons */
+        .study-nav { display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; }
+
+        /* Topic selector */
+        .topic-bar { background:var(--card-bg); border-bottom:1px solid var(--border); padding:0.75rem 1.5rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+
+        /* Summary panel */
+        #summary-panel { display:none; }
+
+        .study-q { display: none; }
+        .study-q.active { display: block; }
+
+        @media print {
+            #study-sidebar, .topic-bar, .study-nav, header, .no-print { display:none !important; }
+            .study-option { border:1px solid #ddd !important; background:white !important; color:black !important; }
+            .study-option.correct-opt { border-color:#059669 !important; }
+        }
+        @media (max-width:700px) {
+            #study-sidebar { display:none; }
+        }
+    </style>
+</head>
+<body>
+    <header style="border-bottom:1px solid var(--border);">
+        <a href="/" class="logo"><img src="{{ url_for('static', filename='mata_logo.jpeg') }}" alt="MATA" style="height:40px;width:auto;"></a>
+        <nav>
+            <span id="score-counter" style="color:var(--text-muted);font-size:0.9rem;margin-right:1rem;"></span>
+            <button onclick="window.print()" class="btn no-print" style="padding:0.4rem 1rem;font-size:0.85rem;">🖨️ Print</button>
+            <a href="/dashboard" style="margin-left:1rem;">← Гарах</a>
+        </nav>
+    </header>
+
+    <!-- Topic selector bar -->
+    <div class="topic-bar no-print">
+        <span style="font-weight:600;font-size:0.9rem;">Сэдэв:</span>
+        <a href="/study_quiz" class="btn {% if not selected_topic %}btn-primary{% else %}btn-outline{% endif %}"
+           style="padding:0.35rem 0.9rem;font-size:0.82rem;">Бүгд ({{ questions|length }})</a>
+        {% for t in topics %}
+        <a href="/study_quiz?topic={{ t|urlencode }}"
+           class="btn {% if selected_topic == t %}btn-primary{% else %}btn-outline{% endif %}"
+           style="padding:0.35rem 0.9rem;font-size:0.82rem;">{{ t }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="study-layout">
+        <!-- Sidebar -->
+        <nav id="study-sidebar">
+            {% set last_topic = namespace(val='') %}
+            {% for q in questions %}
+                {% if q.topic != last_topic.val %}
+                    <div class="sidebar-topic">{{ q.topic or 'Ерөнхий' }}</div>
+                    {% set last_topic.val = q.topic %}
+                {% endif %}
+                <div class="sidebar-item" id="sb-{{ loop.index0 }}" data-idx="{{ loop.index0 }}">
+                    <span class="dot"></span>
+                    <span>{{ loop.index }}. {{ q.question_text[:30] }}{% if q.question_text|length > 30 %}…{% endif %}</span>
+                </div>
+            {% endfor %}
+        </nav>
+
+        <!-- Main -->
+        <div id="study-main">
+            {% if not questions %}
+            <div class="study-card" style="text-align:center;padding:4rem;">
+                <p style="color:var(--text-muted);">
+                    {% if selected_topic %}
+                        "{{ selected_topic }}" сэдвээр асуулт байхгүй байна.
+                    {% else %}
+                        Асуулт байхгүй байна. Контент админ асуулт нэмнэ үү.
+                    {% endif %}
+                </p>
+                <a href="/dashboard" class="btn" style="margin-top:1.5rem;">Буцах</a>
+            </div>
+            {% else %}
+
+            <div class="study-progress no-print">
+                <div class="study-progress-bar" id="progress-bar" style="width:0%"></div>
+            </div>
+
+            <!-- Questions -->
+            {% for q in questions %}
+            <div class="study-q{% if loop.index0 == 0 %} active{% endif %}" id="q-{{ loop.index0 }}">
+                <div class="study-card">
+                    <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:0.5rem;">
+                        Асуулт {{ loop.index }} / {{ questions|length }}
+                        {% if q.topic %} &nbsp;·&nbsp; <strong>{{ q.topic }}</strong>{% endif %}
+                    </p>
+                    <p style="font-size:1.1rem;font-weight:600;line-height:1.6;margin-bottom:1.25rem;">{{ q.question_text }}</p>
+
+                    {% if q.image_filename %}
+                    <div style="text-align:center;margin-bottom:1rem;">
+                        <img src="{{ url_for('static', filename='uploads/' + q.image_filename) }}" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid var(--border);">
+                    </div>
+                    {% endif %}
+
+                    <div class="options-area">
+                    {% if q.q_type == 'mcq' %}
+                        {% for opt, letter in [(q.option_a,'A'),(q.option_b,'B'),(q.option_c,'C'),(q.option_d,'D')] %}
+                        {% if opt %}
+                        <div class="study-option mcq-option" data-val="{{ letter }}" data-correct="{{ q.correct_answer }}">
+                            <span class="opt-letter">{{ letter }}</span> {{ opt }}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+
+                    {% elif q.q_type == 'tf' %}
+                        <div class="study-option tf-option" data-val="True" data-correct="{{ q.correct_answer }}">
+                            <span class="opt-letter">✓</span> Үнэн (True)
+                        </div>
+                        <div class="study-option tf-option" data-val="False" data-correct="{{ q.correct_answer }}">
+                            <span class="opt-letter">✗</span> Худал (False)
+                        </div>
+
+                    {% elif q.q_type == 'numeric' %}
+                        <div style="display:flex;gap:0.75rem;align-items:center;">
+                            <input type="number" step="any" class="form-control numeric-input" placeholder="Тоон хариулт оруулна уу..." style="max-width:200px;">
+                            <button class="btn btn-check-numeric" data-correct="{{ q.correct_answer }}">Шалгах</button>
+                        </div>
+
+                    {% elif q.q_type == 'multi_select' %}
+                        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem;">Зөв хариултуудыг бүгдийг нь сонгоно уу:</p>
+                        {% for opt, letter in [(q.option_a,'A'),(q.option_b,'B'),(q.option_c,'C'),(q.option_d,'D')] %}
+                        {% if opt %}
+                        <div class="study-option ms-option" data-val="{{ letter }}" data-correct="{{ q.correct_answer }}">
+                            <input type="checkbox" style="width:16px;height:16px;"> <span class="opt-letter">{{ letter }}</span> {{ opt }}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        <button class="btn no-print btn-check-ms" data-correct="{{ q.correct_answer }}" style="margin-top:0.75rem;">Шалгах</button>
+
+                    {% elif q.q_type == 'matching' %}
+                        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem;">Зөв хосуудыг харна уу:</p>
+                        {% for opt in [q.option_a, q.option_b, q.option_c, q.option_d] %}
+                        {% if opt and '=' in opt %}
+                        {% set parts = opt.split('=', 1) %}
+                        <div style="display:flex;gap:1rem;align-items:center;padding:0.7rem;border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;">
+                            <span style="font-weight:600;flex:1;">{{ parts[0].strip() }}</span>
+                            <span style="color:var(--text-muted);">→</span>
+                            <span style="flex:1;color:#059669;font-weight:500;">{{ parts[1].strip() }}</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        <button class="btn btn-mark-read" style="margin-top:0.75rem;background:#059669;">✓ Mark as Mastered</button>
+                    {% endif %}
+
+                    <div class="feedback-box feedback-correct" id="fb-correct-{{ loop.index0 }}">✅ Зөв хариулт!</div>
+                    <div class="feedback-box feedback-wrong" id="fb-wrong-{{ loop.index0 }}">❌ Буруу — зөв хариулт: <span class="correct-reveal"></span></div>
+                    </div>
+                </div>
+
+                <div class="study-nav no-print">
+                    <button class="btn btn-outline btn-prev" data-idx="{{ loop.index0 }}" {% if loop.index0 == 0 %}disabled{% endif %}>← Өмнөх</button>
+                    <span style="color:var(--text-muted);font-size:0.9rem;">{{ loop.index }} / {{ questions|length }}</span>
+                    {% if loop.index0 < questions|length - 1 %}
+                    <button class="btn btn-next" data-idx="{{ loop.index0 }}">Дараах →</button>
+                    {% else %}
+                    <button class="btn btn-show-summary" style="background:#059669;">✅ Дүн харах</button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Summary panel -->
+            <div id="summary-panel">
+                <div class="study-card" style="text-align:center;padding:3rem;">
+                    <h2 style="margin-bottom:0.5rem;">Амжилтлаа! 🎉</h2>
+                    <p id="summary-text" style="font-size:1.2rem;margin-bottom:2rem;color:var(--text-muted);"></p>
+                    <canvas id="summaryChart" style="max-width:500px;margin:0 auto 2rem;display:block;"></canvas>
+                    <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+                        <a href="/study_quiz{% if selected_topic %}?topic={{ selected_topic|urlencode }}{% endif %}" class="btn">🔁 Дахин давтах</a>
+                        <a href="/dashboard" class="btn btn-outline">← Нүүр хуудас</a>
+                    </div>
+                </div>
+            </div>
+
+            {% endif %}
+        </div>
+    </div>
+
+    <script id="study-data" type="application/json">
+        {
+            "total_questions": {{ questions|length }}
+        }
+    </script>
+    <script>
+    (function(){
+        const studyData = JSON.parse(document.getElementById('study-data').textContent);
+        const TOTAL = studyData.total_questions;
+        let current = 0;
+        const answered = {}; // index -> true/false
+
+        function goTo(idx) {
+            if (idx < 0 || idx >= TOTAL) return;
+            document.getElementById('q-' + current).classList.remove('active');
+            document.getElementById('sb-' + current)?.classList.remove('active');
+            current = idx;
+            document.getElementById('q-' + current).classList.add('active');
+            document.getElementById('sb-' + current)?.classList.add('active');
+            document.getElementById('sb-' + current)?.scrollIntoView({behavior:'smooth', block:'nearest'});
+            updateProgress();
+        }
+
+        function markSidebar(idx, correct) {
+            const sb = document.getElementById('sb-' + idx);
+            if (!sb) return;
+            sb.classList.remove('answered-correct','answered-wrong');
+            sb.classList.add(correct ? 'answered-correct' : 'answered-wrong');
+            sb.querySelector('.dot').style.background = correct ? '#059669' : '#dc2626';
+        }
+
+        function updateProgress() {
+            const answeredCount = Object.keys(answered).length;
+            const pct = TOTAL > 0 ? (answeredCount / TOTAL * 100) : 0;
+            const pb = document.getElementById('progress-bar');
+            if (pb) pb.style.width = pct + '%';
+            const correctCount = Object.values(answered).filter(Boolean).length;
+            const sc = document.getElementById('score-counter');
+            if (sc) sc.textContent = `✓ ${correctCount} / ${answeredCount} хариулсан`;
+        }
+
+        function showFeedback(qIdx, isCorrect, correctText) {
+            const fc = document.getElementById('fb-correct-' + qIdx);
+            const fw = document.getElementById('fb-wrong-' + qIdx);
+            if (!fc || !fw) return;
+            if (isCorrect) { fc.style.display = 'block'; fw.style.display = 'none'; }
+            else {
+                fw.style.display = 'block'; fc.style.display = 'none';
+                const cr = fw.querySelector('.correct-reveal');
+                if (cr) cr.textContent = correctText;
+            }
+        }
+
+        // Global check functions refactored for listeners
+        function handleCheckAnswer(el) {
+            const parent = el.closest('.study-q');
+            const qIdx = parseInt(parent.id.replace('q-',''));
+            if (answered[qIdx] !== undefined) return;
+            const val = el.dataset.val;
+            const correct = el.dataset.correct;
+            const isCorrect = val.toLowerCase() === correct.toLowerCase();
+            parent.querySelectorAll('.study-option').forEach(opt => {
+                opt.classList.add('revealed');
+                if (opt.dataset.val.toLowerCase() === correct.toLowerCase()) opt.classList.add('correct-opt');
+                else if (opt === el && !isCorrect) opt.classList.add('wrong-opt');
+            });
+            answered[qIdx] = isCorrect;
+            markSidebar(qIdx, isCorrect);
+            showFeedback(qIdx, isCorrect, correct);
+            updateProgress();
+        }
+
+        function handleCheckNumeric(btn) {
+            const parent = btn.closest('.study-q');
+            const qIdx = parseInt(parent.id.replace('q-',''));
+            if (answered[qIdx] !== undefined) return;
+            const correctStr = btn.dataset.correct;
+            const input = parent.querySelector('.numeric-input');
+            const userVal = parseFloat(input.value);
+            const correctVal = parseFloat(correctStr);
+            const isCorrect = !isNaN(userVal) && Math.abs(userVal - correctVal) < 1e-4;
+            input.disabled = true; btn.disabled = true;
+            input.style.borderColor = isCorrect ? '#059669' : '#dc2626';
+            answered[qIdx] = isCorrect;
+            markSidebar(qIdx, isCorrect);
+            showFeedback(qIdx, isCorrect, correctStr);
+            updateProgress();
+        }
+
+        function handleCheckMultiSelect(btn) {
+            const parent = btn.closest('.study-q');
+            const qIdx = parseInt(parent.id.replace('q-',''));
+            if (answered[qIdx] !== undefined) return;
+            const correctStr = btn.dataset.correct;
+            const selected = Array.from(parent.querySelectorAll('.ms-option input:checked')).map(cb => cb.closest('.ms-option').dataset.val.toUpperCase());
+            const correctArr = correctStr.split(',').map(x => x.trim().toUpperCase());
+            const isCorrect = JSON.stringify(selected.sort()) === JSON.stringify(correctArr.sort());
+            parent.querySelectorAll('.ms-option').forEach(opt => {
+                opt.classList.add('revealed');
+                const v = opt.dataset.val.toUpperCase();
+                if (correctArr.includes(v)) opt.classList.add('correct-opt');
+                else if (selected.includes(v)) opt.classList.add('wrong-opt');
+            });
+            btn.disabled = true;
+            answered[qIdx] = isCorrect;
+            markSidebar(qIdx, isCorrect);
+            showFeedback(qIdx, isCorrect, correctArr.join(', '));
+            updateProgress();
+        }
+
+        function handleMarkRead(btn) {
+            const parent = btn.closest('.study-q');
+            const qIdx = parseInt(parent.id.replace('q-',''));
+            if (answered[qIdx] !== undefined) return;
+            btn.disabled = true;
+            answered[qIdx] = true;
+            markSidebar(qIdx, true);
+            updateProgress();
+            // Show a small toast or just dim the button
+            btn.textContent = '✅ Mastered';
+            btn.style.opacity = '0.7';
+        }
+
+        function showSummary() {
+            document.getElementById('q-' + current).style.display = 'none';
+            document.getElementById('sb-' + current)?.classList.remove('active');
+            const panel = document.getElementById('summary-panel');
+            panel.style.display = 'block';
+            const correct = Object.values(answered).filter(Boolean).length;
+            const total = TOTAL;
+            const pct = total > 0 ? Math.round(correct / total * 100) : 0;
+            document.getElementById('summary-text').textContent = `${total} асуултаас ${correct} зөв — ${pct}%`;
+            const ctx = document.getElementById('summaryChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Зөв', 'Буруу'],
+                    datasets: [{ data: [correct, total - correct], backgroundColor: ['#059669','#dc2626'], borderWidth: 0 }]
+                },
+                options: { plugins: { legend: { position: 'bottom' } }, cutout: '70%' }
+            });
+        }
+
+        // --- Event Listeners ---
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.sidebar-item')) {
+                goTo(parseInt(e.target.closest('.sidebar-item').dataset.idx));
+            } else if (e.target.closest('.mcq-option') || e.target.closest('.tf-option')) {
+                handleCheckAnswer(e.target.closest('.study-option'));
+            } else if (e.target.closest('.btn-check-numeric')) {
+                handleCheckNumeric(e.target.closest('.btn-check-numeric'));
+            } else if (e.target.closest('.btn-check-ms')) {
+                handleCheckMultiSelect(e.target.closest('.btn-check-ms'));
+            } else if (e.target.closest('.btn-mark-read')) {
+                handleMarkRead(e.target.closest('.btn-mark-read'));
+            } else if (e.target.closest('.btn-prev')) {
+                goTo(current - 1);
+            } else if (e.target.closest('.btn-next')) {
+                goTo(current + 1);
+            } else if (e.target.closest('.btn-show-summary')) {
+                showSummary();
+            }
+        });
+
+        // Init
+        document.getElementById('sb-0')?.classList.add('active');
+        updateProgress();
+    })();
+    </script>
+</body>
+</html>

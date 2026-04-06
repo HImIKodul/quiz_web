@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | МАТА</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <header>
@@ -25,23 +26,40 @@
                 <p style="color: var(--text-muted);">Та асуултанд хариулахад бэлэн үү</p>
             </div>
         </div>
-        <div class="card" style="text-align: center; padding: 4rem 2rem; margin-top: 1rem; margin-bottom: 2rem;">
+        <div class="card" style="text-align:center;padding:4rem 2rem;margin-top:1rem;margin-bottom:1.5rem;">
             <h2>Мэргэшийн зэрэгийн шалгалт</h2>
-            <p style="margin: 1rem 0 2rem 0; color: var(--text-muted);">
-                Асуултын тоог сонгоод доорх товчийг дарж манай мэдээллийн сангаас шууд татаж авсан шинэ, санамсаргүй асуулт хариултын асуултыг үүсгэнэ үү.
-            </p>
-            <form action="/take_quiz" method="GET" style="display: flex; flex-direction: column; align-items: center; gap: 1.5rem;">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <label for="count" style="font-weight: 500;">Асуултын тоо:</label>
-                    <select name="count" id="count" class="form-control" style="width: auto; padding: 0.5rem; border-color: var(--primary);">
-                        <option value="5">5 Асуулт</option>
-                        <option value="10" selected>10 Асуулт</option>
-                        <option value="20">20 Асуулт</option>
-                        <option value="40">40 Асуулт</option>
-                    </select>
+            <p style="margin:1rem 0 1.5rem 0;color:var(--text-muted);">Асуултын тоо болон хугацааг сонгоод шалгалт эхлүүлнэ үү.</p>
+            <form action="/take_quiz" method="GET" style="display:flex;flex-direction:column;align-items:center;gap:1.25rem;">
+                <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;justify-content:center;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <label for="count" style="font-weight:500;">Асуултын тоо:</label>
+                        <select name="count" id="count" class="form-control" style="width:auto;padding:0.5rem;border-color:var(--primary);">
+                            <option value="5">5 Асуулт</option>
+                            <option value="10" selected>10 Асуулт</option>
+                            <option value="20">20 Асуулт</option>
+                            <option value="40">40 Асуулт</option>
+                            <option value="all">Бүгд</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <label for="timer" style="font-weight:500;">⏱ Хугацаа:</label>
+                        <select name="timer" id="timer" class="form-control" style="width:auto;padding:0.5rem;">
+                            <option value="0">Хугацаагүй</option>
+                            <option value="600">10 минут</option>
+                            <option value="1200">20 минут</option>
+                            <option value="1800">30 минут</option>
+                            <option value="3600">60 минут</option>
+                        </select>
+                    </div>
                 </div>
-                <button type="submit" class="btn" style="font-size: 1.2rem; padding: 1rem 3rem;">Эхлэх</button>
+                <button type="submit" class="btn" style="font-size:1.2rem;padding:1rem 3rem;">Шалгалт эхлэх</button>
             </form>
+        </div>
+
+        <div class="card" style="margin-bottom:2rem;padding:2rem;background:linear-gradient(135deg,#1e1b4b,#312e81);color:white;">
+            <h2 style="color:white;margin-bottom:0.5rem;">📖 Study Mode</h2>
+            <p style="color:#c7d2fe;margin-bottom:1.5rem;">Сэдвээр нь дараалуулан асуулт давтах, шуурхай хариулт шалгах, хэвлэх боломжтой.</p>
+            <a href="/study_quiz" class="btn" style="background:white;color:#312e81;font-weight:700;">Study Mode эхлэх →</a>
         </div>
 
         <div class="dashboard-stats" style="display: flex; gap: 2rem; flex-wrap: wrap;">
@@ -80,39 +98,70 @@
             </div>
         </div>
 
-        <div class="card" style="margin-top: 2rem;">
-            <h3 style="margin-bottom: 1rem;">Шалгалтын түүх</h3>
+        <div class="card" style="margin-top:2rem;">
+            <h3 style="margin-bottom:1rem;">Шалгалтын түүх</h3>
             {% if history %}
-            <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;text-align:left;">
                     <thead>
-                        <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
-                            <th style="padding: 0.8rem;">Огноо</th>
-                            <th style="padding: 0.8rem;">Асуултын тоо</th>
-                            <th style="padding: 0.8rem;">Зөв хариулт</th>
-                            <th style="padding: 0.8rem;">Үнэлгээ</th>
+                        <tr style="border-bottom:2px solid var(--border);background:var(--bg-color);">
+                            <th style="padding:0.8rem;">Огноо</th>
+                            <th style="padding:0.8rem;">Асуулт</th>
+                            <th style="padding:0.8rem;">Зөв</th>
+                            <th style="padding:0.8rem;">Үнэлгээ</th>
+                            <th style="padding:0.8rem;">Дахин харах</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for h in history %}
-                        <tr style="border-bottom: 1px solid var(--border);">
-                            <td style="padding: 0.8rem; color: var(--text-muted); font-size: 0.9rem;">{{ h.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
-                            <td style="padding: 0.8rem;">{{ h.total_questions }}</td>
-                            <td style="padding: 0.8rem; color: #059669; font-weight: 500;">{{ h.correct_answers }}</td>
+                        <tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:0.8rem;color:var(--text-muted);font-size:0.9rem;">{{ h.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td style="padding:0.8rem;">{{ h.total_questions }}</td>
+                            <td style="padding:0.8rem;color:#059669;font-weight:500;">{{ h.correct_answers }}</td>
                             {% if h.score_percent >= 60 %}
-                            <td style="padding: 0.8rem; font-weight: bold; font-size: 1.1rem; color: #059669;">{{ h.score_percent }}%</td>
+                            <td style="padding:0.8rem;font-weight:bold;font-size:1.1rem;color:#059669;">{{ h.score_percent }}%</td>
                             {% else %}
-                            <td style="padding: 0.8rem; font-weight: bold; font-size: 1.1rem; color: #dc2626;">{{ h.score_percent }}%</td>
+                            <td style="padding:0.8rem;font-weight:bold;font-size:1.1rem;color:#dc2626;">{{ h.score_percent }}%</td>
                             {% endif %}
+                            <td style="padding:0.8rem;">
+                                <a href="/result/{{ h.id }}" class="btn" style="padding:0.3rem 0.8rem;font-size:0.8rem;">📋 Харах</a>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
             {% else %}
-                <p style="color: var(--text-muted);">Шалгалтын түүх байхгүй байна.</p>
+                <p style="color:var(--text-muted);">Шалгалтын түүх байхгүй байна.</p>
             {% endif %}
         </div>
+
+        {% if topic_stats %}
+        <div class="card" style="margin-top:2rem;">
+            <h3 style="margin-bottom:1rem;">📊 Сэдвээр авсан оноо</h3>
+            <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:1.5rem;">Аль сэдвийг илүү давтах хэрэгтэйг харуулж байна.</p>
+            <canvas id="topicChart" style="max-height:280px;"></canvas>
+            <script id="topic-data" type="application/json">
+                {{ topic_stats | tojson }}
+            </script>
+            <script>
+            (function(){
+                const topicStats = JSON.parse(document.getElementById('topic-data').textContent);
+                const labels = Object.keys(topicStats);
+                const data   = Object.values(topicStats);
+                const colors = data.map(v => v >= 80 ? '#059669' : v >= 50 ? '#ca8a04' : '#dc2626');
+                new Chart(document.getElementById('topicChart').getContext('2d'), {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: '% Зөв хариулт', data, backgroundColor: colors, borderRadius: 6 }] },
+                    options: {
+                        scales: { y: { min:0, max:100, ticks: { callback: v => v+'%' } } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            })();
+            </script>
+        </div>
+        {% endif %}
 
         <!-- ── SUBSCRIPTION HISTORY ── -->
         <div class="card" style="margin-top: 2rem;">

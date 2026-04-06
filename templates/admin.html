@@ -84,6 +84,14 @@
                     <textarea name="question_text" class="form-control" rows="3" required></textarea>
                 </div>
 
+                <div class="form-group">
+                    <label>Topic / Subject <span style="color:var(--text-muted);font-weight:400;">(optional — used for Study Mode & filtering)</span></label>
+                    <input type="text" name="topic" class="form-control" placeholder="e.g. Math, Science, Law..." list="topic-suggestions" style="border-color:#6366f1;">
+                    <datalist id="topic-suggestions">
+                        {% for t in all_topics %}<option value="{{ t }}"></option>{% endfor %}
+                    </datalist>
+                </div>
+
                 <!-- IMAGE UPLOAD (available for all question types) -->
                 <div class="form-group">
                     <label>Question Image <span style="color: var(--text-muted); font-weight: 400;">(optional — JPG, PNG, GIF, WEBP · max 5MB)</span></label>
@@ -150,52 +158,87 @@
             </form>
         </div>
 
+        <!-- XLSX BULK UPLOAD -->
+        <div class="card" style="margin-top:2rem;border:2px dashed #6366f1;">
+            <h2 style="color:#4f46e5;">📥 Bulk Import from Excel (.xlsx)</h2>
+            <p style="color:var(--text-muted);margin-bottom:1rem;">5 sheet бүхий Excel файл байршуулж олон асуулт нэмнэ үү. Sheet нэрс: <strong>MCQ, TF, Numeric, Matching, MultiSelect</strong></p>
+            <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+                <form action="/admin/content/upload_xlsx" method="POST" enctype="multipart/form-data" style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="file" name="xlsx_file" accept=".xlsx" class="form-control" style="width:auto;" required>
+                    <button type="submit" class="btn" style="background:#4f46e5;">📤 Upload & Import</button>
+                </form>
+                <a href="/admin/content/xlsx_template" class="btn btn-outline" style="border-color:#4f46e5;color:#4f46e5;">⬇️ Download Template</a>
+            </div>
+        </div>
+
         <div class="card" style="margin-top: 3rem;">
             <h2>Search & Manage Questions</h2>
-            <form action="/admin/content" method="GET" style="display: flex; gap: 1rem; align-items: center; margin: 1.5rem 0; flex-wrap: wrap;">
-                <label for="search_type" style="font-weight: 500;">Type:</label>
-                <select name="search_type" class="form-control" style="width: auto;">
-                    <option value="all">All Types</option>
-                    <option value="mcq" {% if search_type == 'mcq' %}selected{% endif %}>MCQ</option>
-                    <option value="multi_select" {% if search_type == 'multi_select' %}selected{% endif %}>Multi-Select</option>
-                    <option value="tf" {% if search_type == 'tf' %}selected{% endif %}>True/False</option>
-                    <option value="numeric" {% if search_type == 'numeric' %}selected{% endif %}>Numeric</option>
-                    <option value="matching" {% if search_type == 'matching' %}selected{% endif %}>Matching</option>
-                </select>
-                <label for="search_date" style="font-weight: 500;">Filter by Date:</label>
-                <input type="date" name="search_date" value="{{ search_date or '' }}" class="form-control" style="width: auto;">
-                <button type="submit" class="btn" style="padding: 0.5rem 1rem;">Search</button>
-                <a href="/admin/content" class="btn btn-outline" style="padding: 0.5rem 1rem;">Clear</a>
+            <form action="/admin/content" method="GET" class="filter-bar" style="background:var(--bg-color);padding:1.25rem;border-radius:12px;display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin:1.5rem 0;border:1px solid var(--border);">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:0.85rem;margin-bottom:0.4rem;font-weight:600;">Type</label>
+                    <select name="search_type" class="form-control" style="width:140px;">
+                        <option value="all">All Types</option>
+                        <option value="mcq" {% if search_type == 'mcq' %}selected{% endif %}>MCQ</option>
+                        <option value="tf" {% if search_type == 'tf' %}selected{% endif %}>T/F</option>
+                        <option value="numeric" {% if search_type == 'numeric' %}selected{% endif %}>Numeric</option>
+                        <option value="matching" {% if search_type == 'matching' %}selected{% endif %}>Matching</option>
+                        <option value="multi_select" {% if search_type == 'multi_select' %}selected{% endif %}>Multi-Select</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:0.85rem;margin-bottom:0.4rem;font-weight:600;">Topic</label>
+                    <select name="search_topic" class="form-control" style="width:160px;">
+                        <option value="">All Topics</option>
+                        {% for t in all_topics %}
+                            <option value="{{ t }}" {% if search_topic == t %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:0.85rem;margin-bottom:0.4rem;font-weight:600;">Admin</label>
+                    <input type="text" name="search_admin" class="form-control" placeholder="Added by..." value="{{ search_admin or '' }}" style="width:150px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:0.85rem;margin-bottom:0.4rem;font-weight:600;">Date</label>
+                    <input type="date" name="search_date" class="form-control" value="{{ search_date or '' }}" style="width:150px;">
+                </div>
+                <div style="display:flex;gap:0.5rem;">
+                    <button type="submit" class="btn" style="padding:0.7rem 1.5rem;">Filter</button>
+                    <a href="/admin/content" class="btn btn-outline" style="padding:0.7rem 1.5rem;">Clear</a>
+                </div>
             </form>
 
             <table style="width: 100%; border-collapse: collapse; text-align: left; margin-top: 1rem;">
                 <thead>
                     <tr style="border-bottom: 2px solid var(--border); background: var(--bg-color);">
-                        <th style="padding: 1rem; font-weight: 600;">Date</th>
-                        <th style="padding: 1rem; font-weight: 600;">Type</th>
-                        <th style="padding: 1rem; font-weight: 600;">Image</th>
-                        <th style="padding: 1rem; font-weight: 600;">Question Content</th>
-                        <th style="padding: 1rem; font-weight: 600; text-align: right;">Action</th>
+                        <th style="padding:1rem;font-weight:600;">Date</th>
+                        <th style="padding:1rem;font-weight:600;">Type</th>
+                        <th style="padding:1rem;font-weight:600;">Topic</th>
+                        <th style="padding:1rem;font-weight:600;">Added By</th>
+                        <th style="padding:1rem;font-weight:600;">Image</th>
+                        <th style="padding:1rem;font-weight:600;">Question</th>
+                        <th style="padding:1rem;font-weight:600;text-align:right;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for q in questions %}
-                    <tr style="border-bottom: 1px solid var(--border);">
-                        <td style="padding: 1rem; color: var(--text-muted);">{{ q.created_at.strftime('%Y-%m-%d') if q.created_at else 'Unknown' }}</td>
-                        <td style="padding: 1rem;"><span style="background: var(--bg-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.85rem;">{{ q.q_type | upper }}</span></td>
-                        <td style="padding: 1rem;">
+                    <tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:0.8rem;color:var(--text-muted);font-size:0.85rem;">{{ q.created_at.strftime('%Y-%m-%d') if q.created_at else '—' }}</td>
+                        <td style="padding:0.8rem;"><span style="background:var(--bg-color);padding:0.2rem 0.6rem;border-radius:4px;font-size:0.82rem;">{{ q.q_type|upper }}</span></td>
+                        <td style="padding:0.8rem;font-size:0.85rem;">{{ q.topic or '—' }}</td>
+                        <td style="padding:0.8rem;font-size:0.82rem;color:var(--text-muted);">{{ q.created_by or '—' }}</td>
+                        <td style="padding:0.8rem;">
                             {% if q.image_filename %}
-                                <img src="{{ url_for('static', filename='uploads/' + q.image_filename) }}" alt="Q image" style="height: 40px; border-radius: 4px; border: 1px solid var(--border);">
-                            {% else %}
-                                <span style="color: var(--text-muted); font-size: 0.8rem;">—</span>
-                            {% endif %}
+                                <img src="{{ url_for('static', filename='uploads/' + q.image_filename) }}" alt="img" style="height:36px;border-radius:4px;border:1px solid var(--border);">
+                            {% else %}<span style="color:var(--text-muted);font-size:0.8rem;">—</span>{% endif %}
                         </td>
-                        <td style="padding: 1rem;">{{ q.question_text[:60] }}...</td>
-                        <td style="padding: 1rem; text-align: right; display: flex; gap: 0.5rem; justify-content: flex-end;">
-                            <a href="/admin/content/edit/{{ q.id }}" class="btn" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Edit</a>
-                            <form action="/admin/content/delete/{{ q.id }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to permanently delete this question?');">
+                        <td style="padding:0.8rem;">{{ q.question_text[:55] }}{% if q.question_text|length > 55 %}…{% endif %}</td>
+                        <td style="padding:0.8rem;text-align:right;display:flex;gap:0.5rem;justify-content:flex-end;">
+                            <a href="/admin/content/edit/{{ q.id }}" class="btn" style="padding:0.4rem 1rem;font-size:0.85rem;">Edit</a>
+                            <form action="/admin/content/delete/{{ q.id }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this question?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline" style="padding: 0.4rem 1rem; font-size: 0.85rem; border-color: #dc2626; color: #dc2626;">Delete</button>
+                                <button type="submit" class="btn btn-outline" style="padding:0.4rem 1rem;font-size:0.85rem;border-color:#dc2626;color:#dc2626;">Delete</button>
                             </form>
                         </td>
                     </tr>

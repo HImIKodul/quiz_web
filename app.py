@@ -4,6 +4,8 @@ import uuid
 import random
 import shutil
 import glob
+import openpyxl
+from collections import defaultdict
 from datetime import datetime, timedelta
 from PIL import Image
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, send_file
@@ -31,9 +33,9 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
 # Upload config
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
-MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024   # 5MB — enforced per image in save_question_image()
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB — allows large XLSX imports
 
 # Backup config
 DB_PATH = os.path.join(BASE_DIR, 'quiz_database.db')
@@ -67,10 +69,10 @@ def set_security_headers(response):
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "img-src 'self' data:; "
-        "font-src 'self';"
+        "font-src 'self' https://fonts.gstatic.com;"
     )
     return response
 
@@ -182,6 +184,8 @@ class Question(db.Model):
     option_d = db.Column(db.String(200), nullable=True)
     correct_answer = db.Column(db.String(200), nullable=False)
     image_filename = db.Column(db.Text, nullable=True)
+    topic = db.Column(db.String(100), nullable=True)
+    created_by = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class ActivityLog(db.Model):
@@ -204,6 +208,17 @@ class SubscriptionHistory(db.Model):
     changed_by = db.Column(db.String(100), nullable=True)  # admin identifier who made the change
     note = db.Column(db.Text, nullable=True)
     user = db.relationship('User', backref=db.backref('subscription_history', lazy=True))
+
+class QuizAttemptDetail(db.Model):
+    """Stores per-question breakdown for each exam — enables result replay."""
+    id = db.Column(db.Integer, primary_key=True)
+    attempt_id = db.Column(db.Integer, db.ForeignKey('quiz_attempt.id'), nullable=False)
+    question_text = db.Column(db.Text, nullable=False)
+    topic = db.Column(db.String(100), nullable=True)
+    user_answer = db.Column(db.Text, nullable=True)
+    correct_answer = db.Column(db.Text, nullable=True)
+    is_correct = db.Column(db.Boolean, default=False)
+    attempt = db.relationship('QuizAttempt', backref=db.backref('details', lazy=True))
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -272,6 +287,8 @@ with app.app_context():
     for ddl in [
         "ALTER TABLE user ADD COLUMN max_devices INTEGER DEFAULT 3;",
         "ALTER TABLE question ADD COLUMN image_filename TEXT;",
+        "ALTER TABLE question ADD COLUMN topic VARCHAR(100);",
+        "ALTER TABLE question ADD COLUMN created_by VARCHAR(100);",
     ]:
         try:
             db.session.execute(db.text(ddl))
@@ -445,8 +462,23 @@ def dashboard():
     devices = UserDevice.query.filter_by(user_id=current_user.id).order_by(UserDevice.registered_at.desc()).all()
     sub_history = SubscriptionHistory.query.filter_by(user_id=current_user.id).order_by(
         SubscriptionHistory.timestamp.desc()).all()
+    # Topic performance from past exam details
+    topic_stats = {}
+    attempt_ids = [a.id for a in history]
+    if attempt_ids:
+        details = QuizAttemptDetail.query.filter(
+            QuizAttemptDetail.attempt_id.in_(attempt_ids),
+            QuizAttemptDetail.topic.isnot(None),
+            QuizAttemptDetail.topic != ''
+        ).all()
+        topic_acc = defaultdict(lambda: [0, 0])
+        for d in details:
+            topic_acc[d.topic][0] += 1
+            if d.is_correct:
+                topic_acc[d.topic][1] += 1
+        topic_stats = {t: round(v[1] / v[0] * 100) for t, v in topic_acc.items() if v[0] > 0}
     return render_template('dashboard.html', name=current_user.name, history=history,
-                           devices=devices, sub_history=sub_history)
+                           devices=devices, sub_history=sub_history, topic_stats=topic_stats)
 
 # ==========================================
 # CONTENT ADMIN ROUTES
@@ -463,6 +495,7 @@ def admin_content():
 
         image_file = request.files.get('question_image')
         image_filename = save_question_image(image_file) if image_file and image_file.filename else None
+        topic = request.form.get('topic', '').strip() or None
 
         new_q = None
         if q_type == 'mcq':
@@ -470,28 +503,28 @@ def admin_content():
                              option_a=request.form.get('mcq_a'), option_b=request.form.get('mcq_b'),
                              option_c=request.form.get('mcq_c'), option_d=request.form.get('mcq_d'),
                              correct_answer=request.form.get('mcq_correct'),
-                             image_filename=image_filename)
+                             image_filename=image_filename, topic=topic, created_by=current_user.identifier)
         elif q_type == 'tf':
             new_q = Question(q_type=q_type, question_text=question_text,
                              correct_answer=request.form.get('tf_correct'),
-                             image_filename=image_filename)
+                             image_filename=image_filename, topic=topic, created_by=current_user.identifier)
         elif q_type == 'numeric':
             new_q = Question(q_type=q_type, question_text=question_text,
                              correct_answer=request.form.get('num_correct'),
-                             image_filename=image_filename)
+                             image_filename=image_filename, topic=topic, created_by=current_user.identifier)
         elif q_type == 'matching':
             new_q = Question(q_type=q_type, question_text=question_text,
                              option_a=request.form.get('match_1'), option_b=request.form.get('match_2'),
                              option_c=request.form.get('match_3'), option_d=request.form.get('match_4'),
                              correct_answer="matching_logic",
-                             image_filename=image_filename)
+                             image_filename=image_filename, topic=topic, created_by=current_user.identifier)
         elif q_type == 'multi_select':
             correct_opts = request.form.getlist('ms_correct')
             new_q = Question(q_type=q_type, question_text=question_text,
                              option_a=request.form.get('ms_a'), option_b=request.form.get('ms_b'),
                              option_c=request.form.get('ms_c'), option_d=request.form.get('ms_d'),
                              correct_answer=",".join(correct_opts),
-                             image_filename=image_filename)
+                             image_filename=image_filename, topic=topic, created_by=current_user.identifier)
         else:
             flash('Invalid question type selected.')
 
@@ -503,11 +536,12 @@ def admin_content():
 
     search_date = request.args.get('search_date')
     search_type = request.args.get('search_type')
+    search_topic = request.args.get('search_topic', '').strip()
+    search_admin = request.args.get('search_admin', '').strip()
     query = Question.query.order_by(Question.created_at.desc())
 
     if search_type and search_type != 'all':
         query = query.filter_by(q_type=search_type)
-
     if search_date:
         try:
             dt_start = datetime.strptime(search_date, '%Y-%m-%d')
@@ -515,11 +549,17 @@ def admin_content():
             query = query.filter(Question.created_at >= dt_start, Question.created_at < dt_end)
         except ValueError:
             pass
+    if search_admin:
+        query = query.filter(Question.created_by.contains(search_admin))
+    if search_topic:
+        query = query.filter(Question.topic == search_topic)
 
     questions = query.all()
     total = Question.query.count()
+    all_topics = sorted(set(q.topic for q in Question.query.all() if q.topic))
     return render_template('admin.html', total=total, questions=questions,
-                           search_date=search_date, search_type=search_type)
+                           search_date=search_date, search_type=search_type,
+                           search_admin=search_admin, search_topic=search_topic, all_topics=all_topics)
 
 @app.route('/admin/content/delete/<int:q_id>', methods=['POST'])
 @login_required
@@ -546,6 +586,7 @@ def admin_content_edit(q_id):
 
     if request.method == 'POST':
         q.question_text = request.form.get('question_text', q.question_text)
+        q.topic = request.form.get('topic', '').strip() or None
 
         remove_image = request.form.get('remove_image') == '1'
         image_file = request.files.get('question_image')
@@ -573,6 +614,7 @@ def admin_content_edit(q_id):
             q.option_b = request.form.get('match_2')
             q.option_c = request.form.get('match_3')
             q.option_d = request.form.get('match_4')
+            q.correct_answer = "matching_logic"
         elif q.q_type == 'multi_select':
             correct_opts = request.form.getlist('ms_correct')
             q.correct_answer = ",".join(correct_opts)
@@ -586,7 +628,8 @@ def admin_content_edit(q_id):
         flash('Question updated successfully!')
         return redirect(url_for('admin_content'))
 
-    return render_template('admin_edit_question.html', q=q)
+    all_topics = sorted(set(t.topic for t in Question.query.all() if t.topic))
+    return render_template('admin_edit_question.html', q=q, all_topics=all_topics)
 
 # ==========================================
 # BILLING ADMIN ROUTES
@@ -769,6 +812,11 @@ def take_quiz():
         return redirect(url_for('subscriptions'))
 
     count_str = request.args.get('count', '10')
+    timer_val = request.args.get('timer', '0')
+    try:
+        timer_seconds = int(timer_val)
+    except ValueError:
+        timer_seconds = 0
     questions = Question.query.all()
 
     if count_str.lower() != 'all':
@@ -779,7 +827,7 @@ def take_quiz():
         random.shuffle(questions)
         questions = questions[:limit]
 
-    return render_template('quiz.html', questions=questions)
+    return render_template('quiz.html', questions=questions, timer_seconds=timer_seconds)
 
 @app.route('/submit_quiz', methods=['POST'])
 @login_required
@@ -868,6 +916,7 @@ def submit_quiz():
 
         results.append({
             'question': q.question_text,
+            'topic': q.topic,
             'user_answer': user_answer,
             'is_correct': is_correct,
             'correct_answer': correct_display
@@ -883,10 +932,178 @@ def submit_quiz():
             correct_answers=correct
         )
         db.session.add(new_attempt)
+        db.session.flush()  # get ID before commit
+        for res in results:
+            db.session.add(QuizAttemptDetail(
+                attempt_id=new_attempt.id,
+                question_text=res['question'],
+                topic=res.get('topic'),
+                user_answer=str(res['user_answer']) if res['user_answer'] else '',
+                correct_answer=str(res['correct_answer']) if res['correct_answer'] else '',
+                is_correct=res['is_correct']
+            ))
         db.session.commit()
 
     return render_template('quiz_result.html', total=total, correct=correct,
                            score_percent=score_percent, results=results)
+
+# ==========================================
+# RESULT REPLAY
+# ==========================================
+@app.route('/result/<int:attempt_id>')
+@login_required
+def result_replay(attempt_id):
+    attempt = QuizAttempt.query.get_or_404(attempt_id)
+    if attempt.user_id != current_user.id:
+        return "Access Denied", 403
+    details = QuizAttemptDetail.query.filter_by(attempt_id=attempt_id).all()
+    return render_template('result_replay.html', attempt=attempt, details=details)
+
+# ==========================================
+# STUDY QUIZ MODE
+# ==========================================
+@app.route('/study_quiz')
+@login_required
+def study_quiz():
+    if current_user.plan == 'none':
+        flash("You need a subscription to access Study Mode!")
+        return redirect(url_for('subscriptions'))
+    topics_raw = db.session.query(Question.topic).filter(
+        Question.topic.isnot(None), Question.topic != ''
+    ).distinct().order_by(Question.topic).all()
+    topics = [t[0] for t in topics_raw]
+    selected_topic = request.args.get('topic', '').strip()
+    query = Question.query.order_by(Question.topic, Question.id)
+    if selected_topic:
+        query = query.filter(Question.topic == selected_topic)
+    questions = query.all()
+    return render_template('study_quiz.html', questions=questions, topics=topics,
+                           selected_topic=selected_topic)
+
+# ==========================================
+# XLSX IMPORT & TEMPLATE DOWNLOAD
+# ==========================================
+@app.route('/admin/content/upload_xlsx', methods=['POST'])
+@login_required
+def upload_xlsx():
+    if current_user.role != 'content_admin':
+        return "Access Denied", 403
+    file = request.files.get('xlsx_file')
+    if not file or not file.filename.lower().endswith('.xlsx'):
+        flash('Please upload a valid .xlsx file.')
+        return redirect(url_for('admin_content'))
+    try:
+        wb = openpyxl.load_workbook(file, data_only=True)
+    except Exception as e:
+        flash(f'Could not read file: {e}')
+        return redirect(url_for('admin_content'))
+
+    imported = 0
+    skipped = 0
+
+    def sv(val):
+        return str(val).strip() if val is not None else None
+
+    if 'MCQ' in wb.sheetnames:
+        for row in wb['MCQ'].iter_rows(min_row=2, values_only=True):
+            try:
+                q_text, a, b, c, d, correct, topic = (list(row) + [None]*7)[:7]
+                if not q_text or not correct: skipped += 1; continue
+                correct = sv(correct).upper()
+                if correct not in ['A','B','C','D']: skipped += 1; continue
+                db.session.add(Question(q_type='mcq', question_text=sv(q_text),
+                    option_a=sv(a), option_b=sv(b), option_c=sv(c), option_d=sv(d),
+                    correct_answer=correct, topic=sv(topic), created_by=current_user.identifier))
+                imported += 1
+            except Exception: skipped += 1
+
+    if 'TF' in wb.sheetnames:
+        for row in wb['TF'].iter_rows(min_row=2, values_only=True):
+            try:
+                q_text, correct, topic = (list(row) + [None]*3)[:3]
+                if not q_text or not correct: skipped += 1; continue
+                correct = sv(correct).capitalize()
+                if correct not in ['True','False']: skipped += 1; continue
+                db.session.add(Question(q_type='tf', question_text=sv(q_text),
+                    correct_answer=correct, topic=sv(topic), created_by=current_user.identifier))
+                imported += 1
+            except Exception: skipped += 1
+
+    if 'Numeric' in wb.sheetnames:
+        for row in wb['Numeric'].iter_rows(min_row=2, values_only=True):
+            try:
+                q_text, correct, topic = (list(row) + [None]*3)[:3]
+                if not q_text or not correct: skipped += 1; continue
+                float(sv(correct))
+                db.session.add(Question(q_type='numeric', question_text=sv(q_text),
+                    correct_answer=sv(correct), topic=sv(topic), created_by=current_user.identifier))
+                imported += 1
+            except Exception: skipped += 1
+
+    if 'Matching' in wb.sheetnames:
+        for row in wb['Matching'].iter_rows(min_row=2, values_only=True):
+            try:
+                q_text, p1, p2, p3, p4, topic = (list(row) + [None]*6)[:6]
+                if not q_text or not p1: skipped += 1; continue
+                db.session.add(Question(q_type='matching', question_text=sv(q_text),
+                    option_a=sv(p1), option_b=sv(p2), option_c=sv(p3), option_d=sv(p4),
+                    correct_answer='matching_logic', topic=sv(topic), created_by=current_user.identifier))
+                imported += 1
+            except Exception: skipped += 1
+
+    if 'MultiSelect' in wb.sheetnames:
+        for row in wb['MultiSelect'].iter_rows(min_row=2, values_only=True):
+            try:
+                q_text, a, b, c, d, correct, topic = (list(row) + [None]*7)[:7]
+                if not q_text or not correct: skipped += 1; continue
+                correct_norm = ','.join(x.strip().upper() for x in sv(correct).split(','))
+                if not all(x in ['A','B','C','D'] for x in correct_norm.split(',')): skipped += 1; continue
+                db.session.add(Question(q_type='multi_select', question_text=sv(q_text),
+                    option_a=sv(a), option_b=sv(b), option_c=sv(c), option_d=sv(d),
+                    correct_answer=correct_norm, topic=sv(topic), created_by=current_user.identifier))
+                imported += 1
+            except Exception: skipped += 1
+
+    db.session.commit()
+    log_activity('xlsx_import', f'Imported {imported} questions, skipped {skipped} rows')
+    flash(f'\u2705 Import complete: {imported} questions added, {skipped} rows skipped.')
+    return redirect(url_for('admin_content'))
+
+@app.route('/admin/content/xlsx_template')
+@login_required
+def download_xlsx_template():
+    if current_user.role != 'content_admin':
+        return "Access Denied", 403
+    from openpyxl.styles import Font, PatternFill, Alignment
+    wb = openpyxl.Workbook()
+    hfont = Font(bold=True, color='FFFFFF')
+    hfill = PatternFill(start_color='4F46E5', end_color='4F46E5', fill_type='solid')
+    def sh(ws, headers):
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.font = hfont; cell.fill = hfill
+            cell.alignment = Alignment(horizontal='center')
+    ws1 = wb.active; ws1.title = 'MCQ'
+    sh(ws1, ['question','option_a','option_b','option_c','option_d','correct','topic'])
+    ws1.append(['What is 2+2?','3','4','5','6','B','Math'])
+    ws1.append(['Sky color?','Red','Blue','Green','Yellow','b','Science'])
+    ws2 = wb.create_sheet('TF')
+    sh(ws2, ['question','correct','topic'])
+    ws2.append(['The earth is round.','True','Science'])
+    ws3 = wb.create_sheet('Numeric')
+    sh(ws3, ['question','correct','topic'])
+    ws3.append(['What is 5x8?','40','Math'])
+    ws4 = wb.create_sheet('Matching')
+    sh(ws4, ['question','pair_1','pair_2','pair_3','pair_4','topic'])
+    ws4.append(['Match fruits to colors:','Apple=Red','Banana=Yellow','Sky=Blue','Grass=Green','General'])
+    ws5 = wb.create_sheet('MultiSelect')
+    sh(ws5, ['question','option_a','option_b','option_c','option_d','correct','topic'])
+    ws5.append(['Select all even numbers:','2','3','4','5','A,C','Math'])
+    ws5.append(['Primary colors?','Red','Orange','Blue','Green','a,c','Art'])
+    output = io.BytesIO()
+    wb.save(output); output.seek(0)
+    return send_file(output, as_attachment=True, download_name='question_template.xlsx',
+                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 if __name__ == '__main__':
     app.run(debug=True)
