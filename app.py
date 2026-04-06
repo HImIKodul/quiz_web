@@ -1,10 +1,11 @@
 import os
+import io
 import uuid
 import random
-import imghdr
 import shutil
 import glob
 from datetime import datetime, timedelta
+from PIL import Image
 from flask import Flask, render_template, request, redirect, url_for, flash, session, make_response, send_file
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -106,8 +107,14 @@ def save_question_image(file):
     if len(file_bytes) > MAX_UPLOAD_SIZE:
         flash('File too large. Maximum size is 5MB.')
         return None
-    detected_type = imghdr.what(None, h=file_bytes)
-    if detected_type not in ['jpeg', 'png', 'gif', 'webp']:
+    # Validate actual image content using Pillow (works on all Python versions)
+    try:
+        img = Image.open(io.BytesIO(file_bytes))
+        img.verify()  # Raises if file is not a valid image
+        if img.format and img.format.lower() not in ['jpeg', 'png', 'gif', 'webp']:
+            flash('File content is not a valid image format.')
+            return None
+    except Exception:
         flash('File content is not a valid image.')
         return None
     ext = file.filename.rsplit('.', 1)[1].lower()
