@@ -182,6 +182,8 @@ class Question(db.Model):
     option_b = db.Column(db.String(200), nullable=True)
     option_c = db.Column(db.String(200), nullable=True)
     option_d = db.Column(db.String(200), nullable=True)
+    option_e = db.Column(db.String(200), nullable=True)
+    option_f = db.Column(db.String(200), nullable=True)
     correct_answer = db.Column(db.String(200), nullable=False)
     image_filename = db.Column(db.Text, nullable=True)
     topic = db.Column(db.String(100), nullable=True)
@@ -289,6 +291,8 @@ with app.app_context():
         "ALTER TABLE question ADD COLUMN image_filename TEXT;",
         "ALTER TABLE question ADD COLUMN topic VARCHAR(100);",
         "ALTER TABLE question ADD COLUMN created_by VARCHAR(100);",
+        "ALTER TABLE question ADD COLUMN option_e VARCHAR(200);",
+        "ALTER TABLE question ADD COLUMN option_f VARCHAR(200);",
     ]:
         try:
             db.session.execute(db.text(ddl))
@@ -300,13 +304,14 @@ with app.app_context():
     db.create_all()
 
     # 4. Seed admin accounts
+    admin_pw = os.getenv('ADMIN_PASSWORD', 'admin123')
     if not User.query.filter_by(identifier='admin_content').first():
-        pw1 = generate_password_hash('admin123')
+        pw1 = generate_password_hash(admin_pw)
         admin1 = User(identifier='admin_content', name='Question Master', password_hash=pw1, role='content_admin')
         db.session.add(admin1)
 
     if not User.query.filter_by(identifier='admin_billing').first():
-        pw2 = generate_password_hash('admin123')
+        pw2 = generate_password_hash(admin_pw)
         admin2 = User(identifier='admin_billing', name='Finance Boss', password_hash=pw2, role='billing_admin')
         db.session.add(admin2)
 
@@ -477,8 +482,10 @@ def dashboard():
             if d.is_correct:
                 topic_acc[d.topic][1] += 1
         topic_stats = {t: round(v[1] / v[0] * 100) for t, v in topic_acc.items() if v[0] > 0}
+    all_topics = sorted(set(q.topic for q in Question.query.all() if q.topic))
     return render_template('dashboard.html', name=current_user.name, history=history,
-                           devices=devices, sub_history=sub_history, topic_stats=topic_stats)
+                           devices=devices, sub_history=sub_history, topic_stats=topic_stats,
+                           all_topics=all_topics)
 
 # ==========================================
 # CONTENT ADMIN ROUTES
@@ -502,6 +509,7 @@ def admin_content():
             new_q = Question(q_type=q_type, question_text=question_text,
                              option_a=request.form.get('mcq_a'), option_b=request.form.get('mcq_b'),
                              option_c=request.form.get('mcq_c'), option_d=request.form.get('mcq_d'),
+                             option_e=request.form.get('mcq_e'), option_f=request.form.get('mcq_f'),
                              correct_answer=request.form.get('mcq_correct'),
                              image_filename=image_filename, topic=topic, created_by=current_user.identifier)
         elif q_type == 'tf':
@@ -516,6 +524,7 @@ def admin_content():
             new_q = Question(q_type=q_type, question_text=question_text,
                              option_a=request.form.get('match_1'), option_b=request.form.get('match_2'),
                              option_c=request.form.get('match_3'), option_d=request.form.get('match_4'),
+                             option_e=request.form.get('match_5'), option_f=request.form.get('match_6'),
                              correct_answer="matching_logic",
                              image_filename=image_filename, topic=topic, created_by=current_user.identifier)
         elif q_type == 'multi_select':
@@ -523,6 +532,7 @@ def admin_content():
             new_q = Question(q_type=q_type, question_text=question_text,
                              option_a=request.form.get('ms_a'), option_b=request.form.get('ms_b'),
                              option_c=request.form.get('ms_c'), option_d=request.form.get('ms_d'),
+                             option_e=request.form.get('ms_e'), option_f=request.form.get('ms_f'),
                              correct_answer=",".join(correct_opts),
                              image_filename=image_filename, topic=topic, created_by=current_user.identifier)
         else:
@@ -604,6 +614,8 @@ def admin_content_edit(q_id):
             q.option_b = request.form.get('mcq_b')
             q.option_c = request.form.get('mcq_c')
             q.option_d = request.form.get('mcq_d')
+            q.option_e = request.form.get('mcq_e')
+            q.option_f = request.form.get('mcq_f')
             q.correct_answer = request.form.get('mcq_correct')
         elif q.q_type == 'tf':
             q.correct_answer = request.form.get('tf_correct')
@@ -614,6 +626,8 @@ def admin_content_edit(q_id):
             q.option_b = request.form.get('match_2')
             q.option_c = request.form.get('match_3')
             q.option_d = request.form.get('match_4')
+            q.option_e = request.form.get('match_5')
+            q.option_f = request.form.get('match_6')
             q.correct_answer = "matching_logic"
         elif q.q_type == 'multi_select':
             correct_opts = request.form.getlist('ms_correct')
@@ -622,6 +636,8 @@ def admin_content_edit(q_id):
             q.option_b = request.form.get('ms_b')
             q.option_c = request.form.get('ms_c')
             q.option_d = request.form.get('ms_d')
+            q.option_e = request.form.get('ms_e')
+            q.option_f = request.form.get('ms_f')
 
         db.session.commit()
         log_activity('question_edited', f'ID:{q_id} [{q.q_type.upper()}] {q.question_text[:50]}')
@@ -778,6 +794,10 @@ def admin_billing_edit_user(user_id):
 def subscriptions():
     return render_template('subscriptions.html')
 
+@app.route('/reading_list')
+def reading_list():
+    return render_template('reading_list.html')
+
 @app.route('/payment/<plan>')
 @login_required
 def payment(plan):
@@ -813,11 +833,17 @@ def take_quiz():
 
     count_str = request.args.get('count', '10')
     timer_val = request.args.get('timer', '0')
+    selected_topic = request.args.get('topic', '').strip()
     try:
         timer_seconds = int(timer_val)
     except ValueError:
         timer_seconds = 0
-    questions = Question.query.all()
+    
+    query = Question.query
+    if selected_topic and selected_topic != 'all':
+        query = query.filter(Question.topic == selected_topic)
+    
+    questions = query.all()
 
     if count_str.lower() != 'all':
         try:
@@ -861,7 +887,10 @@ def submit_quiz():
             is_correct = (user_val.lower() == q.correct_answer.lower())
 
             if q.q_type == 'mcq':
-                val_map = {'A': q.option_a, 'B': q.option_b, 'C': q.option_c, 'D': q.option_d}
+                val_map = {
+                    'A': q.option_a, 'B': q.option_b, 'C': q.option_c, 'D': q.option_d,
+                    'E': q.option_e, 'F': q.option_f
+                }
                 user_answer = val_map.get(user_val.upper(), user_val)
                 correct_display = val_map.get(q.correct_answer.upper(), q.correct_answer)
             else:
@@ -886,7 +915,7 @@ def submit_quiz():
 
             correct_matches = 0
             possible_matches = 0
-            for opt in filter(None, [q.option_a, q.option_b, q.option_c, q.option_d]):
+            for opt in filter(None, [q.option_a, q.option_b, q.option_c, q.option_d, q.option_e, q.option_f]):
                 if '=' in opt:
                     possible_matches += 1
                     prompt, ans = [x.strip() for x in opt.split('=', 1)]
@@ -904,7 +933,10 @@ def submit_quiz():
             correct_ans_sorted = ",".join(sorted([a.strip().lower() for a in q.correct_answer.split(',') if a.strip()]))
             is_correct = (user_ans_sorted == correct_ans_sorted)
 
-            val_map = {'A': q.option_a, 'B': q.option_b, 'C': q.option_c, 'D': q.option_d}
+            val_map = {
+                'A': q.option_a, 'B': q.option_b, 'C': q.option_c, 'D': q.option_d,
+                'E': q.option_e, 'F': q.option_f
+            }
             user_texts = [val_map.get(v.upper(), v) for v in user_answers_list]
             correct_texts = [val_map.get(v.strip().upper(), v.strip()) for v in q.correct_answer.split(',')]
 
@@ -1007,12 +1039,13 @@ def upload_xlsx():
     if 'MCQ' in wb.sheetnames:
         for row in wb['MCQ'].iter_rows(min_row=2, values_only=True):
             try:
-                q_text, a, b, c, d, correct, topic = (list(row) + [None]*7)[:7]
+                q_text, a, b, c, d, e, f, correct, topic = (list(row) + [None]*9)[:9]
                 if not q_text or not correct: skipped += 1; continue
                 correct = sv(correct).upper()
-                if correct not in ['A','B','C','D']: skipped += 1; continue
+                if correct not in ['A','B','C','D','E','F']: skipped += 1; continue
                 db.session.add(Question(q_type='mcq', question_text=sv(q_text),
                     option_a=sv(a), option_b=sv(b), option_c=sv(c), option_d=sv(d),
+                    option_e=sv(e), option_f=sv(f),
                     correct_answer=correct, topic=sv(topic), created_by=current_user.identifier))
                 imported += 1
             except Exception: skipped += 1
@@ -1043,10 +1076,11 @@ def upload_xlsx():
     if 'Matching' in wb.sheetnames:
         for row in wb['Matching'].iter_rows(min_row=2, values_only=True):
             try:
-                q_text, p1, p2, p3, p4, topic = (list(row) + [None]*6)[:6]
+                q_text, p1, p2, p3, p4, p5, p6, topic = (list(row) + [None]*8)[:8]
                 if not q_text or not p1: skipped += 1; continue
                 db.session.add(Question(q_type='matching', question_text=sv(q_text),
                     option_a=sv(p1), option_b=sv(p2), option_c=sv(p3), option_d=sv(p4),
+                    option_e=sv(p5), option_f=sv(p6),
                     correct_answer='matching_logic', topic=sv(topic), created_by=current_user.identifier))
                 imported += 1
             except Exception: skipped += 1
@@ -1054,12 +1088,13 @@ def upload_xlsx():
     if 'MultiSelect' in wb.sheetnames:
         for row in wb['MultiSelect'].iter_rows(min_row=2, values_only=True):
             try:
-                q_text, a, b, c, d, correct, topic = (list(row) + [None]*7)[:7]
+                q_text, a, b, c, d, e, f, correct, topic = (list(row) + [None]*9)[:9]
                 if not q_text or not correct: skipped += 1; continue
                 correct_norm = ','.join(x.strip().upper() for x in sv(correct).split(','))
-                if not all(x in ['A','B','C','D'] for x in correct_norm.split(',')): skipped += 1; continue
+                if not all(x in ['A','B','C','D','E','F'] for x in correct_norm.split(',')): skipped += 1; continue
                 db.session.add(Question(q_type='multi_select', question_text=sv(q_text),
                     option_a=sv(a), option_b=sv(b), option_c=sv(c), option_d=sv(d),
+                    option_e=sv(e), option_f=sv(f),
                     correct_answer=correct_norm, topic=sv(topic), created_by=current_user.identifier))
                 imported += 1
             except Exception: skipped += 1
@@ -1084,9 +1119,9 @@ def download_xlsx_template():
             cell.font = hfont; cell.fill = hfill
             cell.alignment = Alignment(horizontal='center')
     ws1 = wb.active; ws1.title = 'MCQ'
-    sh(ws1, ['question','option_a','option_b','option_c','option_d','correct','topic'])
-    ws1.append(['What is 2+2?','3','4','5','6','B','Math'])
-    ws1.append(['Sky color?','Red','Blue','Green','Yellow','b','Science'])
+    sh(ws1, ['question','option_a','option_b','option_c','option_d','option_e','option_f','correct','topic'])
+    ws1.append(['What is 2+2?','3','4','5','6','','','B','Math'])
+    ws1.append(['Sky color?','Red','Blue','Green','Yellow','White','Black','b','Science'])
     ws2 = wb.create_sheet('TF')
     sh(ws2, ['question','correct','topic'])
     ws2.append(['The earth is round.','True','Science'])
@@ -1094,11 +1129,11 @@ def download_xlsx_template():
     sh(ws3, ['question','correct','topic'])
     ws3.append(['What is 5x8?','40','Math'])
     ws4 = wb.create_sheet('Matching')
-    sh(ws4, ['question','pair_1','pair_2','pair_3','pair_4','topic'])
-    ws4.append(['Match fruits to colors:','Apple=Red','Banana=Yellow','Sky=Blue','Grass=Green','General'])
+    sh(ws4, ['question','pair_1','pair_2','pair_3','pair_4','pair_5','pair_6','topic'])
+    ws4.append(['Match fruits to colors:','Apple=Red','Banana=Yellow','Sky=Blue','Grass=Green','Snow=White','Coal=Black','General'])
     ws5 = wb.create_sheet('MultiSelect')
-    sh(ws5, ['question','option_a','option_b','option_c','option_d','correct','topic'])
-    ws5.append(['Select all even numbers:','2','3','4','5','A,C','Math'])
+    sh(ws5, ['question','option_a','option_b','option_c','option_d','option_e','option_f','correct','topic'])
+    ws5.append(['Select all even numbers:','2','3','4','5','6','8','A,C,E,F','Math'])
     ws5.append(['Primary colors?','Red','Orange','Blue','Green','a,c','Art'])
     output = io.BytesIO()
     wb.save(output); output.seek(0)

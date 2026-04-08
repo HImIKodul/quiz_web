@@ -134,12 +134,22 @@
                     <input type="text" name="mcq_d" class="form-control" value="{{ q.option_d or '' }}">
                 </div>
                 <div class="form-group">
-                    <label>Зөв хариулт (A, B, C, or D)</label>
+                    <label>Хариулт E</label>
+                    <input type="text" name="mcq_e" class="form-control" value="{{ q.option_e or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Хариулт F</label>
+                    <input type="text" name="mcq_f" class="form-control" value="{{ q.option_f or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Зөв хариулт (A, B, C, D, E, or F)</label>
                     <select name="mcq_correct" class="form-control">
                         <option {% if q.correct_answer == 'A' %}selected{% endif %}>A</option>
                         <option {% if q.correct_answer == 'B' %}selected{% endif %}>B</option>
                         <option {% if q.correct_answer == 'C' %}selected{% endif %}>C</option>
                         <option {% if q.correct_answer == 'D' %}selected{% endif %}>D</option>
+                        <option {% if q.correct_answer == 'E' %}selected{% endif %}>E</option>
+                        <option {% if q.correct_answer == 'F' %}selected{% endif %}>F</option>
                     </select>
                 </div>
 
@@ -175,6 +185,14 @@
                     <label>Тохирох хариулт 4</label>
                     <input type="text" name="match_4" class="form-control" value="{{ q.option_d or '' }}">
                 </div>
+                <div class="form-group">
+                    <label>Тохирох хариулт 5</label>
+                    <input type="text" name="match_5" class="form-control" value="{{ q.option_e or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Тохирох хариулт 6</label>
+                    <input type="text" name="match_6" class="form-control" value="{{ q.option_f or '' }}">
+                </div>
 
                 {% elif q.q_type == 'multi_select' %}
                 <div class="form-group">
@@ -188,8 +206,14 @@
                     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
                         <input type="checkbox" name="ms_correct" value="C" {% if 'C' in q.correct_answer.split(',') %}checked{% endif %}><input type="text" name="ms_c" class="form-control" value="{{ q.option_c or '' }}">
                     </div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
                         <input type="checkbox" name="ms_correct" value="D" {% if 'D' in q.correct_answer.split(',') %}checked{% endif %}><input type="text" name="ms_d" class="form-control" value="{{ q.option_d or '' }}">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
+                        <input type="checkbox" name="ms_correct" value="E" {% if 'E' in q.correct_answer.split(',') %}checked{% endif %}><input type="text" name="ms_e" class="form-control" value="{{ q.option_e or '' }}">
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="checkbox" name="ms_correct" value="F" {% if 'F' in q.correct_answer.split(',') %}checked{% endif %}><input type="text" name="ms_f" class="form-control" value="{{ q.option_f or '' }}">
                     </div>
                 </div>
                 {% endif %}

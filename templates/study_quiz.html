@@ -149,7 +149,7 @@
 
                     <div class="options-area">
                     {% if q.q_type == 'mcq' %}
-                        {% for opt, letter in [(q.option_a,'A'),(q.option_b,'B'),(q.option_c,'C'),(q.option_d,'D')] %}
+                        {% for opt, letter in [(q.option_a,'A'),(q.option_b,'B'),(q.option_c,'C'),(q.option_d,'D'),(q.option_e,'E'),(q.option_f,'F')] %}
                         {% if opt %}
                         <div class="study-option mcq-option" data-val="{{ letter }}" data-correct="{{ q.correct_answer }}">
                             <span class="opt-letter">{{ letter }}</span> {{ opt }}
@@ -173,7 +173,7 @@
 
                     {% elif q.q_type == 'multi_select' %}
                         <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem;">Зөв хариултуудыг бүгдийг нь сонгоно уу:</p>
-                        {% for opt, letter in [(q.option_a,'A'),(q.option_b,'B'),(q.option_c,'C'),(q.option_d,'D')] %}
+                        {% for opt, letter in [(q.option_a,'A'),(q.option_b,'B'),(q.option_c,'C'),(q.option_d,'D'),(q.option_e,'E'),(q.option_f,'F')] %}
                         {% if opt %}
                         <div class="study-option ms-option" data-val="{{ letter }}" data-correct="{{ q.correct_answer }}">
                             <input type="checkbox" style="width:16px;height:16px;"> <span class="opt-letter">{{ letter }}</span> {{ opt }}
@@ -184,7 +184,7 @@
 
                     {% elif q.q_type == 'matching' %}
                         <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem;">Зөв хосуудыг харна уу:</p>
-                        {% for opt in [q.option_a, q.option_b, q.option_c, q.option_d] %}
+                        {% for opt in [q.option_a, q.option_b, q.option_c, q.option_d, q.option_e, q.option_f] %}
                         {% if opt and '=' in opt %}
                         {% set parts = opt.split('=', 1) %}
                         <div style="display:flex;gap:1rem;align-items:center;padding:0.7rem;border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;">

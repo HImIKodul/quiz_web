@@ -27,10 +27,22 @@
             </div>
         </div>
         <div class="card" style="text-align:center;padding:4rem 2rem;margin-top:1rem;margin-bottom:1.5rem;">
-            <h2>Мэргэшийн зэрэгийн шалгалт</h2>
+            <h2>Мэргэшлийн зэргийн шалгалт</h2>
             <p style="margin:1rem 0 1.5rem 0;color:var(--text-muted);">Асуултын тоо болон хугацааг сонгоод шалгалт эхлүүлнэ үү.</p>
             <form action="/take_quiz" method="GET" style="display:flex;flex-direction:column;align-items:center;gap:1.25rem;">
                 <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;justify-content:center;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <label for="topic" style="font-weight:500;">📚 Төрөл:</label>
+                        <select name="topic" id="topic" class="form-control" style="max-width:300px;padding:0.5rem;border-color:var(--primary);">
+                            <option value="all">Бүх асуулт</option>
+                            {% for t in all_topics %}
+                                <option value="{{ t }}">{{ t }}</option>
+                            {% endfor %}
+                            <option value="Эмнэлгийн мэргэжилтний хууль, ёс зүйн сорил">Эмнэлгийн мэргэжилтний хууль, ёс зүйн сорил</option>
+                            <option value="Ахлах зэргийн мэргэшлийн шалгалтын сорил">Ахлах зэргийн мэргэшлийн шалгалтын сорил</option>
+                            <option value="Тэргүүлэх зэргийн мэргэшлийн шалгалтын сорил">Тэргүүлэх зэргийн мэргэшлийн шалгалтын сорил</option>
+                        </select>
+                    </div>
                     <div style="display:flex;align-items:center;gap:0.5rem;">
                         <label for="count" style="font-weight:500;">Асуултын тоо:</label>
                         <select name="count" id="count" class="form-control" style="width:auto;padding:0.5rem;border-color:var(--primary);">
