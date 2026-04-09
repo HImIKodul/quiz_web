@@ -1,0 +1,108 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 Int                   @id @default(autoincrement())
+  identifier         String                @unique // Phone number (+976...)
+  name               String
+  passwordHash       String
+  role               String                @default("user") // "user", "content_admin", "billing_admin"
+  plan               String                @default("none") // "none", "plus", "pro"
+  planExpireDate     DateTime?
+  maxDevices         Int?                  @default(3)
+  activeSessionToken String?
+  createdAt          DateTime              @default(now())
+
+  devices             UserDevice[]
+  paymentRequests     PaymentRequest[]
+  subscriptionHistory SubscriptionHistory[]
+  quizAttempts        QuizAttempt[]
+}
+
+model UserDevice {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceToken  String
+  deviceName   String?
+  registeredAt DateTime @default(now())
+}
+
+model PaymentRequest {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestedPlan String
+  status        String   @default("pending") // "pending", "approved", "rejected"
+  createdAt     DateTime @default(now())
+}
+
+model Question {
+  id            Int      @id @default(autoincrement())
+  qType         String   @default("mcq") // "mcq", "tf", "numeric", "matching", "multi_select"
+  questionText  String
+  optionA       String?
+  optionB       String?
+  optionC       String?
+  optionD       String?
+  optionE       String?
+  optionF       String?
+  correctAnswer String
+  imageFilename String?
+  topic         String?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+}
+
+model ActivityLog {
+  id             Int      @id @default(autoincrement())
+  timestamp      DateTime @default(now())
+  userId         Int?
+  userIdentifier String?
+  action         String
+  details        String?
+  ipAddress      String?
+}
+
+model SubscriptionHistory {
+  id        Int      @id @default(autoincrement())
+  timestamp DateTime @default(now())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // "requested", "approved", "rejected", "expired", "admin_edit"
+  plan      String?
+  changedBy String?  // Admin identifier
+  note      String?
+}
+
+model QuizAttempt {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scorePercent   Int
+  totalQuestions Int
+  correctAnswers Int
+  timestamp      DateTime @default(now())
+
+  details QuizAttemptDetail[]
+}
+
+model QuizAttemptDetail {
+  id            Int         @id @default(autoincrement())
+  attemptId     Int
+  attempt       QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionText  String
+  topic         String?
+  userAnswer    String?
+  correctAnswer String?
+  isCorrect     Boolean     @default(false)
+}
