@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MATA | Нүүр хуудас</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
     <header>
-        
+
         <a href="/" class="logo">
-            <img src="{{ url_for('static', filename='mata_logo.jpeg') }}" alt="MATA Logo" style="height: 40px; width: auto;">
+            <img src="{{ url_for('static', filename='mata_logo.jpeg') }}" alt="MATA Logo"
+                style="height: 40px; width: auto;">
         </a>
         <nav>
             <a href="/subscriptions">Төлбөр</a>
@@ -21,16 +24,18 @@
 
     <section class="hero">
         <h1>МЭРГЭШЛИЙН ЗЭРГИЙН ШАЛГАЛТ</h1>
-        <p>Манай салбарын стандартын асуулт хариулт, сургалтын модулиудаар дамжуулан карьераа ахиулж буй мянга мянган мэргэжилтнүүдтэй нэгдээрэй.</p>
+        <p>Манай салбарын стандартын асуулт хариулт, сургалтын модулиудаар дамжуулан карьераа ахиулж буй мянга мянган
+            мэргэжилтнүүдтэй нэгдээрэй.</p>
         <div>
             <a href="/dashboard" class="btn">Эхлэх</a>
             <a href="/subscriptions" class="btn btn-outline" style="margin-left: 1rem;">Төлбөр</a>
         </div>
         <div style="margin-top: 2rem;">
-            <a href="/reading_list" style="color: white; text-decoration: underline; font-size: 0.9rem; opacity: 0.9;">
+            <a href="/reading_list" style="color: black; text-decoration: underline; font-size: 0.9rem; opacity: 0.9;">
                 📚 Унших материалын жагсаалт харах
             </a>
         </div>
     </section>
 </body>
+
 </html>

@@ -288,6 +288,9 @@ with app.app_context():
     # 2. Safe column migrations (fail silently if column already exists)
     for ddl in [
         "ALTER TABLE user ADD COLUMN max_devices INTEGER DEFAULT 3;",
+        "ALTER TABLE user ADD COLUMN plan VARCHAR(50) DEFAULT 'none';",
+        "ALTER TABLE user ADD COLUMN plan_expire_date DATETIME;",
+        "ALTER TABLE user ADD COLUMN active_session_token VARCHAR(256);",
         "ALTER TABLE question ADD COLUMN image_filename TEXT;",
         "ALTER TABLE question ADD COLUMN topic VARCHAR(100);",
         "ALTER TABLE question ADD COLUMN created_by VARCHAR(100);",
