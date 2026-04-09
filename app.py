@@ -281,44 +281,7 @@ def log_subscription(user_id, action, plan, changed_by=None, note=None):
 # ==========================================
 # STARTUP: BACKUP → MIGRATIONS → SEED ADMINS
 # ==========================================
-with app.app_context():
-    # 1. Backup FIRST before touching anything
-    backup_database()
-
-    # 2. Safe column migrations (fail silently if column already exists)
-    for ddl in [
-        "ALTER TABLE user ADD COLUMN max_devices INTEGER DEFAULT 3;",
-        "ALTER TABLE user ADD COLUMN plan VARCHAR(50) DEFAULT 'none';",
-        "ALTER TABLE user ADD COLUMN plan_expire_date DATETIME;",
-        "ALTER TABLE user ADD COLUMN active_session_token VARCHAR(256);",
-        "ALTER TABLE question ADD COLUMN image_filename TEXT;",
-        "ALTER TABLE question ADD COLUMN topic VARCHAR(100);",
-        "ALTER TABLE question ADD COLUMN created_by VARCHAR(100);",
-        "ALTER TABLE question ADD COLUMN option_e VARCHAR(200);",
-        "ALTER TABLE question ADD COLUMN option_f VARCHAR(200);",
-    ]:
-        try:
-            db.session.execute(db.text(ddl))
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-
-    # 3. Create all tables (new models: ActivityLog, SubscriptionHistory)
-    db.create_all()
-
-    # 4. Seed admin accounts
-    admin_pw = os.getenv('ADMIN_PASSWORD', 'admin123')
-    if not User.query.filter_by(identifier='admin_content').first():
-        pw1 = generate_password_hash(admin_pw)
-        admin1 = User(identifier='admin_content', name='Question Master', password_hash=pw1, role='content_admin')
-        db.session.add(admin1)
-
-    if not User.query.filter_by(identifier='admin_billing').first():
-        pw2 = generate_password_hash(admin_pw)
-        admin2 = User(identifier='admin_billing', name='Finance Boss', password_hash=pw2, role='billing_admin')
-        db.session.add(admin2)
-
-    db.session.commit()
+# Initialization logic moved to migrate.py
 
 # ==========================================
 # SESSION & SUBSCRIPTION GUARD
